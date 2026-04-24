@@ -231,3 +231,30 @@ export interface MySessionRow {
   ip: string | null;
   user_agent: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// M7A item 2: tenant + workspace CRUD
+// ---------------------------------------------------------------------------
+
+export interface CreateTenantPayload {
+  slug: string;
+  name: string;
+}
+
+export interface PatchTenantPayload {
+  name: string;
+}
+
+export interface CreateWorkspacePayload {
+  slug: string;
+  name: string;
+}
+
+export interface PatchWorkspacePayload {
+  name: string;
+}
+
+export interface UpdateMePayload {
+  display_name?: string | null;
+  avatar_url?: string | null;
+}

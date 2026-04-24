@@ -5,15 +5,19 @@ import {
   type AuditFilters,
   type AuditRow,
   type CreateMyTokenPayload,
+  type CreateTenantPayload,
   type CreateTenantTokenPayload,
   type CreateTokenResult,
   type CreateUserPayload,
+  type CreateWorkspacePayload,
   type CursorListResponse,
   type MeResponse,
   type MySessionRow,
   type MyTokenRow,
   type OffsetListResponse,
+  type PatchTenantPayload,
   type PatchWorkspaceMemberPayload,
+  type PatchWorkspacePayload,
   type PermissionsResponse,
   type ProvidersResponse,
   type RolesResponse,
@@ -21,6 +25,7 @@ import {
   type TenantDetail,
   type TenantRow,
   type TokenRow,
+  type UpdateMePayload,
   type UserRow,
   type WorkspaceMemberRow,
   type WorkspaceRow,
@@ -158,6 +163,47 @@ export const identityApi = {
   revokeTenantToken: (tenantId: number, tokenId: number) =>
     identityFetch<void>(`/api/tenants/${tenantId}/tokens/${tokenId}`, {
       method: "DELETE",
+    }),
+
+  // --- M7A item 2: tenant + workspace CRUD ---
+  createTenant: (payload: CreateTenantPayload) =>
+    identityFetch<TenantDetail>("/api/admin/tenants", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateTenant: (id: number, payload: PatchTenantPayload) =>
+    identityFetch<TenantDetail>(`/api/admin/tenants/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteTenant: (id: number) =>
+    identityFetch<void>(`/api/admin/tenants/${id}`, { method: "DELETE" }),
+
+  createWorkspace: (tenantId: number, payload: CreateWorkspacePayload) =>
+    identityFetch<WorkspaceRow>(`/api/tenants/${tenantId}/workspaces`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateWorkspace: (
+    tenantId: number,
+    wsId: number,
+    payload: PatchWorkspacePayload,
+  ) =>
+    identityFetch<WorkspaceRow>(
+      `/api/tenants/${tenantId}/workspaces/${wsId}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+    ),
+  deleteWorkspace: (tenantId: number, wsId: number) =>
+    identityFetch<void>(
+      `/api/tenants/${tenantId}/workspaces/${wsId}`,
+      { method: "DELETE" },
+    ),
+
+  // PATCH /api/me — update own display_name + avatar_url
+  updateMe: (payload: UpdateMePayload) =>
+    identityFetch<MeResponse>("/api/me", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
     }),
 
   // --- A4: /api/me/* tokens & sessions ---

@@ -15,13 +15,18 @@ import {
   type AddWorkspaceMemberPayload,
   type AuditFilters,
   type CreateMyTokenPayload,
+  type CreateTenantPayload,
   type CreateTenantTokenPayload,
   type CreateUserPayload,
+  type CreateWorkspacePayload,
   type IdentityError,
   type MeResponse,
+  type PatchTenantPayload,
   type PatchWorkspaceMemberPayload,
+  type PatchWorkspacePayload,
   type Permission,
   type RoleName,
+  type UpdateMePayload,
 } from "./types";
 
 export function useIdentity() {
@@ -364,6 +369,111 @@ export function useRevokeMySession() {
     mutationFn: (sid: string) => identityApi.revokeMySession(sid),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: identityKeys.mySessions() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// M7A item 2: tenant + workspace CRUD hooks
+// ---------------------------------------------------------------------------
+
+export function useCreateTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateTenantPayload) =>
+      identityApi.createTenant(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: identityKeys.tenants() });
+    },
+  });
+}
+
+export function useUpdateTenant(id: number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PatchTenantPayload) => {
+      if (!id) throw new Error("no tenant id");
+      return identityApi.updateTenant(id, payload);
+    },
+    onSuccess: () => {
+      if (id) {
+        void qc.invalidateQueries({ queryKey: identityKeys.tenant(id) });
+        void qc.invalidateQueries({ queryKey: identityKeys.tenants() });
+      }
+    },
+  });
+}
+
+export function useDeleteTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => identityApi.deleteTenant(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: identityKeys.tenants() });
+    },
+  });
+}
+
+export function useCreateWorkspace(tenantId: number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateWorkspacePayload) => {
+      if (!tenantId) throw new Error("no active tenant");
+      return identityApi.createWorkspace(tenantId, payload);
+    },
+    onSuccess: () => {
+      if (tenantId) {
+        void qc.invalidateQueries({
+          queryKey: identityKeys.workspaces(tenantId),
+        });
+      }
+    },
+  });
+}
+
+export function useUpdateWorkspace(
+  tenantId: number | undefined,
+  wsId: number | undefined,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: PatchWorkspacePayload) => {
+      if (!tenantId || !wsId) throw new Error("missing tenant or workspace");
+      return identityApi.updateWorkspace(tenantId, wsId, payload);
+    },
+    onSuccess: () => {
+      if (tenantId) {
+        void qc.invalidateQueries({
+          queryKey: identityKeys.workspaces(tenantId),
+        });
+      }
+    },
+  });
+}
+
+export function useDeleteWorkspace(tenantId: number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (wsId: number) => {
+      if (!tenantId) throw new Error("no active tenant");
+      return identityApi.deleteWorkspace(tenantId, wsId);
+    },
+    onSuccess: () => {
+      if (tenantId) {
+        void qc.invalidateQueries({
+          queryKey: identityKeys.workspaces(tenantId),
+        });
+      }
+    },
+  });
+}
+
+export function useUpdateMe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateMePayload) => identityApi.updateMe(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: identityKeys.me() });
     },
   });
 }
