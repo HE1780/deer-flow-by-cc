@@ -37,7 +37,17 @@ import type { AuditFilters, AuditRow } from "@/core/identity/types";
 
 export default function AuditPage() {
   return (
-    <RequirePermission perm="audit:read">
+    <RequirePermission
+      perm="audit:read"
+      fallback={
+        <section className="p-6" data-testid="audit-denied">
+          <h2 className="text-lg font-semibold">Permission required</h2>
+          <p className="text-sm text-muted-foreground">
+            You need <code>audit:read</code> to view audit logs.
+          </p>
+        </section>
+      }
+    >
       <Inner />
     </RequirePermission>
   );
