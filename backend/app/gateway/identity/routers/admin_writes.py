@@ -23,6 +23,7 @@ from app.gateway.identity.models import (
     ApiToken,
     Membership,
     Role,
+    Tenant,
     User,
     Workspace,
     WorkspaceMember,
@@ -378,4 +379,239 @@ async def revoke_tenant_token(
         # Generic 404 keeps cross-tenant existence opaque.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "token not found")
     await revoke_api_token(session, token_id=token_id, by_user_id=_caller_user_id(request))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Tenant CRUD (M7A item 2)
+# ---------------------------------------------------------------------------
+
+_SLUG_RE = re.compile(r"^[a-z0-9-]{2,64}$")
+
+
+class CreateTenantIn(BaseModel):
+    slug: str
+    name: str
+
+    @field_validator("slug")
+    @classmethod
+    def _slug_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not _SLUG_RE.match(v):
+            raise ValueError("slug must be 2-64 chars of [a-z0-9-]")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _name_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not (1 <= len(v) <= 128):
+            raise ValueError("name must be 1-128 chars")
+        return v
+
+
+class PatchTenantIn(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _name_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not (1 <= len(v) <= 128):
+            raise ValueError("name must be 1-128 chars")
+        return v
+
+
+class TenantOut(BaseModel):
+    id: int
+    slug: str
+    name: str
+    plan: str
+    status: int
+
+
+def _tenant_out(t: Tenant | Any) -> TenantOut:
+    return TenantOut(
+        id=t.id,
+        slug=t.slug,
+        name=t.name,
+        plan=getattr(t, "plan", "free"),
+        status=getattr(t, "status", 1),
+    )
+
+
+@router.post(
+    "/api/admin/tenants",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("tenant:create", "platform"))],
+    response_model=TenantOut,
+)
+async def create_tenant(
+    body: CreateTenantIn,
+    session: AsyncSession = Depends(get_session),
+) -> TenantOut:
+    existing = (
+        await session.execute(select(Tenant).where(Tenant.slug == body.slug))
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "slug already in use")
+    tenant = Tenant(slug=body.slug, name=body.name)
+    session.add(tenant)
+    await session.flush()
+    await session.commit()
+    return _tenant_out(tenant)
+
+
+@router.patch(
+    "/api/admin/tenants/{tid}",
+    dependencies=[Depends(requires("tenant:update", "platform"))],
+    response_model=TenantOut,
+)
+async def update_tenant(
+    tid: int,
+    body: PatchTenantIn,
+    session: AsyncSession = Depends(get_session),
+) -> TenantOut:
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tid))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "tenant not found")
+    tenant.name = body.name
+    await session.commit()
+    return _tenant_out(tenant)
+
+
+@router.delete(
+    "/api/admin/tenants/{tid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("tenant:delete", "platform"))],
+)
+async def delete_tenant(
+    tid: int,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    tenant = (
+        await session.execute(select(Tenant).where(Tenant.id == tid))
+    ).scalar_one_or_none()
+    if tenant is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "tenant not found")
+    # No deleted_at column; soft-deactivate by flipping status to 0.
+    tenant.status = 0
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Workspace CRUD (M7A item 2)
+# ---------------------------------------------------------------------------
+
+
+class CreateWorkspaceIn(BaseModel):
+    slug: str
+    name: str
+
+    @field_validator("slug")
+    @classmethod
+    def _slug_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not _SLUG_RE.match(v):
+            raise ValueError("slug must be 2-64 chars of [a-z0-9-]")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _name_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not (1 <= len(v) <= 128):
+            raise ValueError("name must be 1-128 chars")
+        return v
+
+
+class PatchWorkspaceIn(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def _name_shape(cls, v: str) -> str:
+        v = v.strip()
+        if not (1 <= len(v) <= 128):
+            raise ValueError("name must be 1-128 chars")
+        return v
+
+
+class WorkspaceOut(BaseModel):
+    id: int
+    tenant_id: int
+    slug: str
+    name: str
+
+
+def _workspace_out(w: Workspace | Any) -> WorkspaceOut:
+    return WorkspaceOut(id=w.id, tenant_id=w.tenant_id, slug=w.slug, name=w.name)
+
+
+@router.post(
+    "/api/tenants/{tid}/workspaces",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("workspace:create", "tenant"))],
+    response_model=WorkspaceOut,
+)
+async def create_workspace(
+    tid: int,
+    body: CreateWorkspaceIn,
+    session: AsyncSession = Depends(get_session),
+) -> WorkspaceOut:
+    existing = (
+        await session.execute(
+            select(Workspace).where(
+                Workspace.tenant_id == tid, Workspace.slug == body.slug
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "slug already in use")
+    ws = Workspace(tenant_id=tid, slug=body.slug, name=body.name)
+    session.add(ws)
+    await session.flush()
+    await session.commit()
+    return _workspace_out(ws)
+
+
+@router.patch(
+    "/api/tenants/{tid}/workspaces/{wid}",
+    dependencies=[Depends(requires("workspace:update", "tenant"))],
+    response_model=WorkspaceOut,
+)
+async def update_workspace(
+    tid: int,
+    wid: int,
+    body: PatchWorkspaceIn,
+    session: AsyncSession = Depends(get_session),
+) -> WorkspaceOut:
+    ws = _resolve_workspace(
+        await session.execute(select(Workspace).where(Workspace.id == wid)),
+        tid,
+    )
+    ws.name = body.name
+    await session.commit()
+    return _workspace_out(ws)
+
+
+@router.delete(
+    "/api/tenants/{tid}/workspaces/{wid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("workspace:delete", "tenant"))],
+)
+async def delete_workspace(
+    tid: int,
+    wid: int,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    ws = _resolve_workspace(
+        await session.execute(select(Workspace).where(Workspace.id == wid)),
+        tid,
+    )
+    await session.delete(ws)
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

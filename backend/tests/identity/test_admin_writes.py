@@ -539,3 +539,300 @@ def test_revoke_tenant_token_blocks_cross_tenant(writes_app):
     with TestClient(app) as c:
         r = c.delete("/api/tenants/5/tokens/200")
     assert r.status_code == 404  # generic 404 — never confirm cross-tenant existence
+
+
+# ---------------------------------------------------------------------------
+# Tenant CRUD (M7A item 2)
+# ---------------------------------------------------------------------------
+
+
+def test_create_tenant_allowed_for_platform_admin(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+
+    class _Sess(_StubSession):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            result = MagicMock()
+            # First call: slug lookup -> none
+            if self.calls == 1:
+                result.scalar_one_or_none.return_value = None
+            return result
+
+        def add(self, obj):
+            super().add(obj)
+            from app.gateway.identity.models import Tenant
+
+            if isinstance(obj, Tenant):
+                obj.id = 77
+                obj.plan = "free"
+                obj.status = 1
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
+        )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["slug"] == "acme"
+    assert body["id"] == 77
+
+
+def test_create_tenant_forbidden_for_tenant_owner(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
+        )
+    assert r.status_code == 403
+
+
+def test_create_tenant_409_on_slug_conflict(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+
+    existing = SimpleNamespace(id=1, slug="acme", name="Acme")
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = existing
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
+        )
+    assert r.status_code == 409
+    assert "slug" in r.json()["detail"].lower()
+
+
+def test_create_tenant_422_on_invalid_slug(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/admin/tenants", json={"slug": "NO-CAPS", "name": "x"}
+        )
+    assert r.status_code == 422
+
+
+def test_patch_tenant_renames(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+
+    tenant = SimpleNamespace(id=5, slug="acme", name="Old", plan="free", status=1)
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = tenant
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.patch("/api/admin/tenants/5", json={"name": "New"})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "New"
+    assert tenant.name == "New"
+
+
+def test_patch_tenant_404_missing(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = None
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.patch("/api/admin/tenants/999", json={"name": "z"})
+    assert r.status_code == 404
+
+
+def test_patch_tenant_forbidden_for_tenant_owner(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+    with TestClient(app) as c:
+        r = c.patch("/api/admin/tenants/5", json={"name": "x"})
+    assert r.status_code == 403
+
+
+def test_delete_tenant_sets_status_zero(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
+
+    tenant = SimpleNamespace(id=5, slug="acme", name="Acme", plan="free", status=1)
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = tenant
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.delete("/api/admin/tenants/5")
+    assert r.status_code == 204
+    assert tenant.status == 0
+
+
+def test_delete_tenant_forbidden_for_tenant_owner(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+    with TestClient(app) as c:
+        r = c.delete("/api/admin/tenants/5")
+    assert r.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Workspace CRUD (M7A item 2)
+# ---------------------------------------------------------------------------
+
+
+def test_create_workspace_allowed_for_tenant_owner(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    class _Sess(_StubSession):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            result = MagicMock()
+            if self.calls == 1:
+                # Slug+tenant lookup -> none
+                result.scalar_one_or_none.return_value = None
+            return result
+
+        def add(self, obj):
+            super().add(obj)
+            from app.gateway.identity.models import Workspace
+
+            if isinstance(obj, Workspace):
+                obj.id = 13
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/tenants/5/workspaces",
+            json={"slug": "eng", "name": "Engineering"},
+        )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["tenant_id"] == 5
+    assert body["slug"] == "eng"
+    assert body["id"] == 13
+
+
+def test_create_workspace_forbidden_for_member(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("member", tenant_id=5)
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/tenants/5/workspaces",
+            json={"slug": "eng", "name": "Engineering"},
+        )
+    assert r.status_code == 403
+
+
+def test_create_workspace_409_on_slug_conflict(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    existing = SimpleNamespace(id=1, tenant_id=5, slug="eng", name="Engineering")
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = existing
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/tenants/5/workspaces",
+            json={"slug": "eng", "name": "Engineering"},
+        )
+    assert r.status_code == 409
+
+
+def test_patch_workspace_renames(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    ws = SimpleNamespace(id=7, tenant_id=5, slug="eng", name="Old")
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = ws
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.patch(
+            "/api/tenants/5/workspaces/7", json={"name": "New"}
+        )
+    assert r.status_code == 200, r.text
+    assert ws.name == "New"
+
+
+def test_patch_workspace_cross_tenant_404(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    # Workspace exists but in a different tenant.
+    ws = SimpleNamespace(id=7, tenant_id=99, slug="eng", name="Old")
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = ws
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.patch(
+            "/api/tenants/5/workspaces/7", json={"name": "New"}
+        )
+    assert r.status_code == 404
+
+
+def test_delete_workspace_removes_row(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    ws = SimpleNamespace(id=7, tenant_id=5, slug="eng", name="Eng")
+
+    class _Sess(_StubSession):
+        async def execute(self, stmt):
+            result = MagicMock()
+            result.scalar_one_or_none.return_value = ws
+            return result
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/5/workspaces/7")
+    assert r.status_code == 204
+    assert ws in holder["session"].deleted
+
+
+def test_delete_workspace_forbidden_for_member(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("member", tenant_id=5)
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/5/workspaces/7")
+    assert r.status_code == 403
