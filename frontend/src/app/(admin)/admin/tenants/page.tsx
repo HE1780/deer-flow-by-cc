@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useI18n } from "@/core/i18n/hooks";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import { useCreateTenant, useTenants } from "@/core/identity/hooks";
 import {
@@ -42,6 +43,7 @@ export default function TenantsPage() {
 }
 
 function TenantsInner() {
+  const { t } = useI18n();
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
@@ -54,7 +56,7 @@ function TenantsInner() {
   return (
     <section className="p-6" data-testid="tenants-page">
       <header className="mb-4 flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold">Tenants</h1>
+        <h1 className="text-xl font-semibold">{t.admin.pages.tenantsTitle}</h1>
         <div className="flex items-center gap-2">
           <Input
             aria-label="Filter by slug"
@@ -71,7 +73,7 @@ function TenantsInner() {
               data-testid="tenants-new-btn"
               onClick={() => setCreateOpen(true)}
             >
-              New Tenant
+              {t.admin.actions.newTenant}
             </Button>
           </RequirePermission>
         </div>

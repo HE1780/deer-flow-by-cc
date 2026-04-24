@@ -400,6 +400,8 @@ export interface Translations {
     actions: {
       newToken: string;
       newUser: string;
+      newTenant: string;
+      newWorkspace: string;
       addMember: string;
       revoke: string;
       remove: string;
@@ -410,6 +412,10 @@ export interface Translations {
       done: string;
       exportCsv: string;
       signOut: string;
+      rename: string;
+      delete: string;
+      save: string;
+      saveChanges: string;
     };
     profile: {
       tabBasic: string;
@@ -418,6 +424,20 @@ export interface Translations {
       activeTenant: string;
       workspaces: string;
       permissions: string;
+    };
+    forms: {
+      slugLabel: string;
+      slugHint: string;
+      displayNameLabel: string;
+      emailLabel: string;
+      tenantCreateTitle: string;
+      tenantCreateDesc: string;
+      tenantRenameTitle: string;
+      tenantRenameDesc: string;
+      workspaceCreateTitle: string;
+      workspaceCreateDesc: string;
+      workspaceRenameTitle: string;
+      workspaceRenameDesc: string;
     };
     audit: {
       filterAction: string;

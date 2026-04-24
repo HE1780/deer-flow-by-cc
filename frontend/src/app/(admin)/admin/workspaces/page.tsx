@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useI18n } from "@/core/i18n/hooks";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
   useCreateWorkspace,
@@ -46,6 +47,7 @@ export default function WorkspacesPage() {
 }
 
 function Inner() {
+  const { t } = useI18n();
   const { identity } = useIdentity();
   const tid = identity?.active_tenant_id ?? undefined;
   const [offset, setOffset] = useState(0);
@@ -57,14 +59,14 @@ function Inner() {
   return (
     <section className="p-6" data-testid="workspaces-page">
       <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Workspaces</h1>
+        <h1 className="text-xl font-semibold">{t.admin.pages.workspacesTitle}</h1>
         <RequirePermission perm="workspace:create" fallback={null}>
           <Button
             data-testid="workspaces-new-btn"
             onClick={() => setCreateOpen(true)}
             disabled={!tid}
           >
-            New Workspace
+            {t.admin.actions.newWorkspace}
           </Button>
         </RequirePermission>
       </header>
