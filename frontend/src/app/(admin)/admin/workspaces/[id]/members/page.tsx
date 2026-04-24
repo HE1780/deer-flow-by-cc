@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { PermBadge } from "@/core/identity/components/PermBadge";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
@@ -167,7 +168,6 @@ function MemberRow({
 }) {
   const patch = usePatchWorkspaceMemberRole(tenantId, wsId);
   const remove = useRemoveWorkspaceMember(tenantId, wsId);
-  const [confirming, setConfirming] = useState(false);
 
   return (
     <TableRow data-testid={`member-row-${member.id}`}>
@@ -202,36 +202,15 @@ function MemberRow({
       <TableCell>{member.joined_at?.slice(0, 10) ?? "—"}</TableCell>
       {(canPatch || canRemove) && (
         <TableCell>
-          {canRemove &&
-            (!confirming ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setConfirming(true)}
-                data-testid={`member-remove-${member.id}`}
-              >
-                Remove
-              </Button>
-            ) : (
-              <span className="flex items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => remove.mutate(member.id)}
-                  disabled={remove.isPending}
-                  data-testid={`member-remove-confirm-${member.id}`}
-                >
-                  Confirm
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirming(false)}
-                >
-                  Cancel
-                </Button>
-              </span>
-            ))}
+          {canRemove && (
+            <InlineConfirm
+              label="Remove"
+              onConfirm={() => remove.mutate(member.id)}
+              pending={remove.isPending}
+              triggerTestId={`member-remove-${member.id}`}
+              confirmTestId={`member-remove-confirm-${member.id}`}
+            />
+          )}
         </TableCell>
       )}
     </TableRow>

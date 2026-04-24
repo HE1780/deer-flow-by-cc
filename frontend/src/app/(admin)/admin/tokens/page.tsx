@@ -1,8 +1,8 @@
 // frontend/src/app/(admin)/admin/tokens/page.tsx
 "use client";
 
-import { CopyIcon, KeyIcon, PlusIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { KeyIcon, PlusIcon } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useI18n } from "@/core/i18n/hooks";
+import { CopyableSecret } from "@/core/identity/components/CopyableSecret";
+import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { PermBadge } from "@/core/identity/components/PermBadge";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
@@ -269,21 +271,6 @@ function PlaintextDialog({
   token: CreateTokenResult;
   onClose: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Auto-focus the value so it's selectable on open. Browsers' clipboard API
-  // sometimes needs a user gesture, so we keep the explicit Copy button too.
-  useEffect(() => {
-    inputRef.current?.select();
-  }, []);
-
-  const onCopy = async () => {
-    await navigator.clipboard.writeText(token.plaintext);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="token-plaintext-dialog">
@@ -296,23 +283,11 @@ function PlaintextDialog({
             <span className="font-mono"> {token.prefix} </span> remains.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex items-center gap-2">
-          <Input
-            ref={inputRef}
-            readOnly
-            value={token.plaintext}
-            className="font-mono"
-            data-testid="token-plaintext-value"
-          />
-          <Button
-            type="button"
-            size="sm"
-            onClick={onCopy}
-            data-testid="token-copy-btn"
-          >
-            <CopyIcon className="size-4" /> {copied ? "Copied" : "Copy"}
-          </Button>
-        </div>
+        <CopyableSecret
+          value={token.plaintext}
+          valueTestId="token-plaintext-value"
+          copyTestId="token-copy-btn"
+        />
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" data-testid="token-plaintext-close-btn">
@@ -327,33 +302,13 @@ function PlaintextDialog({
 
 function RevokeButton({ tenantId, tokenId }: { tenantId: number; tokenId: number }) {
   const revoke = useRevokeTenantToken(tenantId);
-  const [confirming, setConfirming] = useState(false);
-  if (!confirming) {
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => setConfirming(true)}
-        data-testid={`token-revoke-${tokenId}`}
-      >
-        Revoke
-      </Button>
-    );
-  }
   return (
-    <span className="flex items-center gap-1">
-      <Button
-        size="sm"
-        variant="destructive"
-        onClick={() => revoke.mutate(tokenId)}
-        disabled={revoke.isPending}
-        data-testid={`token-revoke-confirm-${tokenId}`}
-      >
-        Confirm
-      </Button>
-      <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
-        Cancel
-      </Button>
-    </span>
+    <InlineConfirm
+      label="Revoke"
+      onConfirm={() => revoke.mutate(tokenId)}
+      pending={revoke.isPending}
+      triggerTestId={`token-revoke-${tokenId}`}
+      confirmTestId={`token-revoke-confirm-${tokenId}`}
+    />
   );
 }
