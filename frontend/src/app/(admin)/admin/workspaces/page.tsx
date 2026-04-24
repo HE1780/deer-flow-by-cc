@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -35,7 +36,14 @@ function Inner() {
   });
   return (
     <section className="p-6">
-      <h1 className="mb-4 text-xl font-semibold">Workspaces</h1>
+      <header className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Workspaces</h1>
+        <RequirePermission perm="workspace:create" fallback={null}>
+          <Button data-testid="workspaces-new-btn" disabled>
+            New Workspace
+          </Button>
+        </RequirePermission>
+      </header>
       <Table>
         <TableHeader>
           <TableRow>

@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -37,18 +38,25 @@ function TenantsInner() {
 
   return (
     <section className="p-6">
-      <header className="mb-4 flex items-center justify-between">
+      <header className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Tenants</h1>
-        <Input
-          aria-label="Filter by slug"
-          placeholder="Filter by slug…"
-          className="w-64"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setOffset(0);
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            aria-label="Filter by slug"
+            placeholder="Filter by slug…"
+            className="w-64"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setOffset(0);
+            }}
+          />
+          <RequirePermission perm="tenant:create" fallback={null}>
+            <Button data-testid="tenants-new-btn" disabled>
+              New Tenant
+            </Button>
+          </RequirePermission>
+        </div>
       </header>
 
       <Table>
