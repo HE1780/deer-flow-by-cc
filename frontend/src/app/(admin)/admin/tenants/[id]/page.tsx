@@ -1,9 +1,11 @@
 // frontend/src/app/(admin)/admin/tenants/[id]/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +25,10 @@ import {
   useTenant,
   useUpdateTenant,
 } from "@/core/identity/hooks";
+import {
+  type RenameTenantFields,
+  renameTenantSchema,
+} from "@/core/identity/schemas";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -130,18 +136,25 @@ function RenameTenantDialog({
   initialName: string;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(initialName);
-  const [error, setError] = useState<string | null>(null);
   const patch = useUpdateTenant(tenantId);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<RenameTenantFields>({
+    resolver: zodResolver(renameTenantSchema),
+    defaultValues: { name: initialName },
+  });
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async (data: RenameTenantFields) => {
     try {
-      await patch.mutateAsync({ name: name.trim() });
+      await patch.mutateAsync({ name: data.name.trim() });
       onClose();
     } catch (err) {
-      setError((err as Error).message || "Failed to rename tenant");
+      setError("root", {
+        message: (err as Error).message || "Failed to rename tenant",
+      });
     }
   };
 
@@ -154,19 +167,17 @@ function RenameTenantDialog({
             The display name can be changed freely; the slug is permanent.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Input
             data-testid="tenant-rename-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
+            {...register("name")}
           />
-          {error && (
+          {errors.root && (
             <p
               className="text-sm text-destructive"
               data-testid="tenant-rename-error"
             >
-              {error}
+              {errors.root.message}
             </p>
           )}
           <DialogFooter>
@@ -181,9 +192,9 @@ function RenameTenantDialog({
             <Button
               type="submit"
               data-testid="tenant-rename-submit"
-              disabled={patch.isPending}
+              disabled={isSubmitting}
             >
-              {patch.isPending ? "Saving…" : "Save"}
+              {isSubmitting ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </form>

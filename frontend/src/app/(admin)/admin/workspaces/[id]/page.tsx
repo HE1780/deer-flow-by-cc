@@ -1,9 +1,11 @@
 // frontend/src/app/(admin)/admin/workspaces/[id]/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +26,10 @@ import {
   useUpdateWorkspace,
   useWorkspaces,
 } from "@/core/identity/hooks";
+import {
+  type RenameWorkspaceFields,
+  renameWorkspaceSchema,
+} from "@/core/identity/schemas";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -140,18 +146,25 @@ function RenameWorkspaceDialog({
   initialName: string;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(initialName);
-  const [error, setError] = useState<string | null>(null);
   const patch = useUpdateWorkspace(tenantId, wsId);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<RenameWorkspaceFields>({
+    resolver: zodResolver(renameWorkspaceSchema),
+    defaultValues: { name: initialName },
+  });
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async (data: RenameWorkspaceFields) => {
     try {
-      await patch.mutateAsync({ name: name.trim() });
+      await patch.mutateAsync({ name: data.name.trim() });
       onClose();
     } catch (err) {
-      setError((err as Error).message || "Failed to rename workspace");
+      setError("root", {
+        message: (err as Error).message || "Failed to rename workspace",
+      });
     }
   };
 
@@ -164,19 +177,17 @@ function RenameWorkspaceDialog({
             The display name can be changed freely; the slug is permanent.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Input
             data-testid="workspace-rename-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
+            {...register("name")}
           />
-          {error && (
+          {errors.root && (
             <p
               className="text-sm text-destructive"
               data-testid="workspace-rename-error"
             >
-              {error}
+              {errors.root.message}
             </p>
           )}
           <DialogFooter>
@@ -191,9 +202,9 @@ function RenameWorkspaceDialog({
             <Button
               type="submit"
               data-testid="workspace-rename-submit"
-              disabled={patch.isPending}
+              disabled={isSubmitting}
             >
-              {patch.isPending ? "Saving…" : "Save"}
+              {isSubmitting ? "Saving…" : "Save"}
             </Button>
           </DialogFooter>
         </form>

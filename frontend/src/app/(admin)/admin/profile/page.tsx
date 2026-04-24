@@ -1,9 +1,11 @@
 // frontend/src/app/(admin)/admin/profile/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CopyIcon, KeyIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,7 +35,12 @@ import {
   useMyTokens,
   useRevokeMySession,
   useRevokeMyToken,
+  useUpdateMe,
 } from "@/core/identity/hooks";
+import {
+  type ProfileBasicFields,
+  profileBasicSchema,
+} from "@/core/identity/schemas";
 import { type CreateTokenResult } from "@/core/identity/types";
 
 export default function ProfilePage() {
@@ -97,6 +104,10 @@ export default function ProfilePage() {
         </TabsList>
 
         <TabsContent value="basic" className="mt-4 space-y-6">
+          <ProfileBasicForm
+            initialName={identity.display_name ?? ""}
+            email={identity.email}
+          />
           <section>
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
               {t.admin.profile.activeTenant}
@@ -148,6 +159,86 @@ export default function ProfilePage() {
         </TabsContent>
       </Tabs>
     </main>
+  );
+}
+
+function ProfileBasicForm({
+  initialName,
+  email,
+}: {
+  initialName: string;
+  email: string | null;
+}) {
+  const updateMe = useUpdateMe();
+  const [saved, setSaved] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting, isDirty },
+    setError,
+    reset,
+  } = useForm<ProfileBasicFields>({
+    resolver: zodResolver(profileBasicSchema),
+    defaultValues: { display_name: initialName },
+  });
+
+  const onSubmit = async (data: ProfileBasicFields) => {
+    try {
+      await updateMe.mutateAsync({ display_name: data.display_name.trim() });
+      reset({ display_name: data.display_name.trim() });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError("root", {
+        message: (err as Error).message || "Failed to save",
+      });
+    }
+  };
+
+  return (
+    <section data-testid="profile-basic-form">
+      <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        Profile
+      </h2>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 max-w-sm">
+        <div className="grid gap-1 text-sm">
+          <label htmlFor="profile-email">Email</label>
+          <Input
+            id="profile-email"
+            value={email ?? ""}
+            readOnly
+            disabled
+            className="text-muted-foreground"
+          />
+        </div>
+        <div className="grid gap-1 text-sm">
+          <label htmlFor="profile-display-name">Display name</label>
+          <Input
+            id="profile-display-name"
+            data-testid="profile-display-name"
+            {...register("display_name")}
+          />
+          {errors.display_name && (
+            <p className="text-xs text-destructive">
+              {errors.display_name.message}
+            </p>
+          )}
+        </div>
+        {errors.root && (
+          <p className="text-sm text-destructive" data-testid="profile-save-error">
+            {errors.root.message}
+          </p>
+        )}
+        <Button
+          type="submit"
+          size="sm"
+          disabled={isSubmitting || !isDirty}
+          data-testid="profile-save-btn"
+        >
+          {isSubmitting ? "Saving…" : saved ? "Saved!" : "Save changes"}
+        </Button>
+      </form>
+    </section>
   );
 }
 

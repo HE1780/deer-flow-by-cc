@@ -1,8 +1,10 @@
 // frontend/src/app/(admin)/admin/tenants/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +26,10 @@ import {
 } from "@/components/ui/table";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import { useCreateTenant, useTenants } from "@/core/identity/hooks";
+import {
+  type CreateTenantFields,
+  createTenantSchema,
+} from "@/core/identity/schemas";
 
 const PAGE_SIZE = 20;
 
@@ -148,20 +154,22 @@ function TenantsInner() {
 }
 
 function CreateTenantDialog({ onClose }: { onClose: () => void }) {
-  const [slug, setSlug] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const create = useCreateTenant();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<CreateTenantFields>({ resolver: zodResolver(createTenantSchema) });
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async (data: CreateTenantFields) => {
     try {
-      await create.mutateAsync({ slug: slug.trim(), name: name.trim() });
+      await create.mutateAsync({ slug: data.slug, name: data.name });
       onClose();
     } catch (err) {
-      const msg = (err as Error).message || "Failed to create tenant";
-      setError(msg);
+      setError("root", {
+        message: (err as Error).message || "Failed to create tenant",
+      });
     }
   };
 
@@ -175,7 +183,7 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
             choose carefully.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="tenant-slug">
               Slug
@@ -183,15 +191,16 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
             <Input
               id="tenant-slug"
               data-testid="tenants-create-slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
               placeholder="acme"
-              pattern="^[a-z0-9-]{2,64}$"
-              required
+              {...register("slug")}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
-              2–64 chars, lowercase letters, digits, or dashes.
-            </p>
+            {errors.slug ? (
+              <p className="mt-1 text-xs text-destructive">{errors.slug.message}</p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                2–64 chars, lowercase letters, digits, or dashes.
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="tenant-name">
@@ -200,15 +209,16 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
             <Input
               id="tenant-name"
               data-testid="tenants-create-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder="Acme Inc"
-              required
+              {...register("name")}
             />
+            {errors.name && (
+              <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>
+            )}
           </div>
-          {error && (
+          {errors.root && (
             <p className="text-sm text-destructive" data-testid="tenants-create-error">
-              {error}
+              {errors.root.message}
             </p>
           )}
           <DialogFooter>
@@ -223,9 +233,9 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
             <Button
               type="submit"
               data-testid="tenants-create-submit"
-              disabled={create.isPending}
+              disabled={isSubmitting}
             >
-              {create.isPending ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </form>

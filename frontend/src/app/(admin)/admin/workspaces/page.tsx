@@ -1,8 +1,10 @@
 // frontend/src/app/(admin)/admin/workspaces/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +30,10 @@ import {
   useIdentity,
   useWorkspaces,
 } from "@/core/identity/hooks";
+import {
+  type CreateWorkspaceFields,
+  createWorkspaceSchema,
+} from "@/core/identity/schemas";
 
 const PAGE_SIZE = 20;
 
@@ -139,19 +145,24 @@ function CreateWorkspaceDialog({
   tenantId: number;
   onClose: () => void;
 }) {
-  const [slug, setSlug] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const create = useCreateWorkspace(tenantId);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<CreateWorkspaceFields>({
+    resolver: zodResolver(createWorkspaceSchema),
+  });
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const onSubmit = async (data: CreateWorkspaceFields) => {
     try {
-      await create.mutateAsync({ slug: slug.trim(), name: name.trim() });
+      await create.mutateAsync({ slug: data.slug, name: data.name });
       onClose();
     } catch (err) {
-      setError((err as Error).message || "Failed to create workspace");
+      setError("root", {
+        message: (err as Error).message || "Failed to create workspace",
+      });
     }
   };
 
@@ -164,7 +175,7 @@ function CreateWorkspaceDialog({
             The slug is scoped to the current tenant and permanent.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div>
             <label
               className="mb-1 block text-sm font-medium"
@@ -175,11 +186,11 @@ function CreateWorkspaceDialog({
             <Input
               id="workspace-slug"
               data-testid="workspaces-create-slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              pattern="^[a-z0-9-]{2,64}$"
-              required
+              {...register("slug")}
             />
+            {errors.slug && (
+              <p className="mt-1 text-xs text-destructive">{errors.slug.message}</p>
+            )}
           </div>
           <div>
             <label
@@ -191,17 +202,18 @@ function CreateWorkspaceDialog({
             <Input
               id="workspace-name"
               data-testid="workspaces-create-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
+              {...register("name")}
             />
+            {errors.name && (
+              <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>
+            )}
           </div>
-          {error && (
+          {errors.root && (
             <p
               className="text-sm text-destructive"
               data-testid="workspaces-create-error"
             >
-              {error}
+              {errors.root.message}
             </p>
           )}
           <DialogFooter>
@@ -216,9 +228,9 @@ function CreateWorkspaceDialog({
             <Button
               type="submit"
               data-testid="workspaces-create-submit"
-              disabled={create.isPending}
+              disabled={isSubmitting}
             >
-              {create.isPending ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </form>

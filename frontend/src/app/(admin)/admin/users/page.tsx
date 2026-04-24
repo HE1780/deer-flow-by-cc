@@ -1,9 +1,11 @@
 // frontend/src/app/(admin)/admin/users/page.tsx
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +35,10 @@ import {
   useIdentity,
   useUsers,
 } from "@/core/identity/hooks";
+import {
+  type CreateUserFields,
+  createUserSchema,
+} from "@/core/identity/schemas";
 
 const PAGE_SIZE = 20;
 
@@ -167,9 +173,28 @@ function CreateUserDialog({
   tenantId: number;
   onClose: () => void;
 }) {
-  const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
   const create = useCreateUser(tenantId);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+  } = useForm<CreateUserFields>({ resolver: zodResolver(createUserSchema) });
+
+  const onSubmit = async (data: CreateUserFields) => {
+    try {
+      await create.mutateAsync({
+        email: data.email,
+        display_name: data.display_name?.trim() ?? undefined,
+      });
+      onClose();
+    } catch {
+      setError("root", {
+        message:
+          "Could not create user. The email may already be a member of this tenant.",
+      });
+    }
+  };
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -181,41 +206,32 @@ function CreateUserDialog({
             and inherit the tenant&apos;s default workspace role.
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="grid gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate(
-              {
-                email: email.trim(),
-                display_name: displayName.trim() || undefined,
-              },
-              { onSuccess: onClose },
-            );
-          }}
-        >
-          <label className="grid gap-1 text-sm">
-            <span>Email</span>
+        <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid gap-1 text-sm">
+            <label htmlFor="users-create-email">Email</label>
             <Input
+              id="users-create-email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+              {...register("email")}
               data-testid="users-create-email"
             />
-          </label>
-          <label className="grid gap-1 text-sm">
-            <span>Display name (optional)</span>
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email.message}</p>
+            )}
+          </div>
+          <div className="grid gap-1 text-sm">
+            <label htmlFor="users-create-display-name">
+              Display name (optional)
+            </label>
             <Input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
+              id="users-create-display-name"
+              {...register("display_name")}
               data-testid="users-create-display-name"
             />
-          </label>
-          {create.isError && (
+          </div>
+          {errors.root && (
             <p className="text-sm text-red-600" role="alert">
-              Could not create user. The email may already be a member of this
-              tenant.
+              {errors.root.message}
             </p>
           )}
           <DialogFooter>
@@ -226,10 +242,10 @@ function CreateUserDialog({
             </DialogClose>
             <Button
               type="submit"
-              disabled={create.isPending || !email.trim()}
+              disabled={isSubmitting}
               data-testid="users-create-submit"
             >
-              {create.isPending ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </form>
