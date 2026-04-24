@@ -239,6 +239,12 @@ export interface MockWritesRecorder {
   createMyToken: { body: unknown }[];
   revokeMyToken: { url: string }[];
   revokeMySession: { url: string }[];
+  createTenant: { body: unknown }[];
+  updateTenant: { body: unknown; url: string }[];
+  deleteTenant: { url: string }[];
+  createWorkspace: { body: unknown }[];
+  updateWorkspace: { body: unknown; url: string }[];
+  deleteWorkspace: { url: string }[];
 }
 
 export interface MockWritesOptions {
@@ -275,6 +281,12 @@ export async function mockWrites(
     createMyToken: [],
     revokeMyToken: [],
     revokeMySession: [],
+    createTenant: [],
+    updateTenant: [],
+    deleteTenant: [],
+    createWorkspace: [],
+    updateWorkspace: [],
+    deleteWorkspace: [],
   };
 
   await page.route(
@@ -448,6 +460,130 @@ export async function mockWrites(
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({ status: "revoked" }),
+        });
+      }
+      return route.fallback();
+    },
+  );
+
+  const getJson = (route: Route) => {
+    try {
+      return (route.request().postDataJSON() as unknown) ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  // /api/admin/tenants/{id} — PATCH rename, DELETE soft-delete
+  await page.route(
+    /\/api\/admin\/tenants\/(\d+)$/,
+    async (route: Route) => {
+      const req = route.request();
+      const url = req.url();
+      const id = Number((/\/tenants\/(\d+)$/.exec(url))?.[1] ?? 0);
+      if (req.method() === "PATCH") {
+        const body = getJson(route);
+        rec.updateTenant.push({ body, url });
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id,
+            slug: "acme",
+            name: (body as { name?: string } | null)?.name ?? "Acme",
+            plan: "free",
+            status: 1,
+            created_at: null,
+            member_count: 0,
+            workspace_count: 0,
+          }),
+        });
+      }
+      if (req.method() === "DELETE") {
+        rec.deleteTenant.push({ url });
+        return route.fulfill({ status: 204, body: "" });
+      }
+      return route.fallback();
+    },
+  );
+
+  // /api/admin/tenants — POST create
+  await page.route(
+    /\/api\/admin\/tenants(\?|$)/,
+    async (route: Route) => {
+      const req = route.request();
+      if (req.method() === "POST") {
+        const body = getJson(route);
+        rec.createTenant.push({ body });
+        return route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: 99,
+            slug: (body as { slug?: string } | null)?.slug ?? "new",
+            name: (body as { name?: string } | null)?.name ?? "New",
+            plan: "free",
+            status: 1,
+            created_at: null,
+          }),
+        });
+      }
+      return route.fallback();
+    },
+  );
+
+  // /api/tenants/{tid}/workspaces/{wid} — PATCH rename, DELETE
+  await page.route(
+    /\/api\/tenants\/(\d+)\/workspaces\/(\d+)$/,
+    async (route: Route) => {
+      const req = route.request();
+      const url = req.url();
+      const wid = Number((/\/workspaces\/(\d+)$/.exec(url))?.[1] ?? 0);
+      if (req.method() === "PATCH") {
+        const body = getJson(route);
+        rec.updateWorkspace.push({ body, url });
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: wid,
+            tenant_id: 1,
+            slug: "main",
+            name: (body as { name?: string } | null)?.name ?? "Main",
+            description: null,
+            created_at: null,
+            member_count: 0,
+          }),
+        });
+      }
+      if (req.method() === "DELETE") {
+        rec.deleteWorkspace.push({ url });
+        return route.fulfill({ status: 204, body: "" });
+      }
+      return route.fallback();
+    },
+  );
+
+  // /api/tenants/{tid}/workspaces — POST create (catches ?limit= etc via (\?|$))
+  await page.route(
+    /\/api\/tenants\/(\d+)\/workspaces(\?|$)/,
+    async (route: Route) => {
+      const req = route.request();
+      if (req.method() === "POST") {
+        const body = getJson(route);
+        rec.createWorkspace.push({ body });
+        return route.fulfill({
+          status: 201,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: 88,
+            tenant_id: 1,
+            slug: (body as { slug?: string } | null)?.slug ?? "new",
+            name: (body as { name?: string } | null)?.name ?? "New",
+            description: null,
+            created_at: null,
+            member_count: 0,
+          }),
         });
       }
       return route.fallback();
