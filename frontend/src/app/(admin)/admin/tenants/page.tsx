@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -15,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
-import { useTenants } from "@/core/identity/hooks";
+import { useCreateTenant, useTenants } from "@/core/identity/hooks";
 
 const PAGE_SIZE = 20;
 
@@ -30,6 +38,7 @@ export default function TenantsPage() {
 function TenantsInner() {
   const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
   const { data, isLoading, isError } = useTenants({
     q,
     offset,
@@ -37,7 +46,7 @@ function TenantsInner() {
   });
 
   return (
-    <section className="p-6">
+    <section className="p-6" data-testid="tenants-page">
       <header className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Tenants</h1>
         <div className="flex items-center gap-2">
@@ -52,12 +61,19 @@ function TenantsInner() {
             }}
           />
           <RequirePermission perm="tenant:create" fallback={null}>
-            <Button data-testid="tenants-new-btn" disabled>
+            <Button
+              data-testid="tenants-new-btn"
+              onClick={() => setCreateOpen(true)}
+            >
               New Tenant
             </Button>
           </RequirePermission>
         </div>
       </header>
+
+      {createOpen && (
+        <CreateTenantDialog onClose={() => setCreateOpen(false)} />
+      )}
 
       <Table>
         <TableHeader>
@@ -128,5 +144,92 @@ function TenantsInner() {
         </div>
       </footer>
     </section>
+  );
+}
+
+function CreateTenantDialog({ onClose }: { onClose: () => void }) {
+  const [slug, setSlug] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const create = useCreateTenant();
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      await create.mutateAsync({ slug: slug.trim(), name: name.trim() });
+      onClose();
+    } catch (err) {
+      const msg = (err as Error).message || "Failed to create tenant";
+      setError(msg);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent data-testid="tenants-create-dialog">
+        <DialogHeader>
+          <DialogTitle>New tenant</DialogTitle>
+          <DialogDescription>
+            Platform admins can create a new tenant. The slug is permanent —
+            choose carefully.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium" htmlFor="tenant-slug">
+              Slug
+            </label>
+            <Input
+              id="tenant-slug"
+              data-testid="tenants-create-slug"
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              placeholder="acme"
+              pattern="^[a-z0-9-]{2,64}$"
+              required
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              2–64 chars, lowercase letters, digits, or dashes.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium" htmlFor="tenant-name">
+              Display name
+            </label>
+            <Input
+              id="tenant-name"
+              data-testid="tenants-create-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Acme Inc"
+              required
+            />
+          </div>
+          {error && (
+            <p className="text-sm text-destructive" data-testid="tenants-create-error">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
+              data-testid="tenants-create-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              data-testid="tenants-create-submit"
+              disabled={create.isPending}
+            >
+              {create.isPending ? "Creating…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

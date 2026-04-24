@@ -1,4 +1,4 @@
-// frontend/src/app/(admin)/admin/tenants/[id]/page.tsx
+// frontend/src/app/(admin)/admin/workspaces/[id]/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -18,54 +18,59 @@ import { Input } from "@/components/ui/input";
 import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
-  useDeleteTenant,
+  useDeleteWorkspace,
   useHasPermission,
-  useTenant,
-  useUpdateTenant,
+  useIdentity,
+  useUpdateWorkspace,
+  useWorkspaces,
 } from "@/core/identity/hooks";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-export default function TenantDetailPage({ params }: Props) {
+export default function WorkspaceDetailPage({ params }: Props) {
   const { id } = use(params);
-  const tenantId = Number(id);
+  const wsId = Number(id);
   return (
-    <RequirePermission perm="tenant:read">
-      <Inner id={tenantId} />
+    <RequirePermission perm="workspace:read">
+      <Inner wsId={wsId} />
     </RequirePermission>
   );
 }
 
-function Inner({ id }: { id: number }) {
+function Inner({ wsId }: { wsId: number }) {
   const router = useRouter();
-  const { data, isLoading, isError } = useTenant(id);
+  const { identity } = useIdentity();
+  const tid = identity?.active_tenant_id ?? undefined;
+  const { data, isLoading } = useWorkspaces(tid, { limit: 200 });
+  const workspace = data?.items.find((w) => w.id === wsId);
+
   const [renameOpen, setRenameOpen] = useState(false);
-  const canUpdate = useHasPermission("tenant:update");
-  const canDelete = useHasPermission("tenant:delete");
-  const remove = useDeleteTenant();
+  const canUpdate = useHasPermission("workspace:update");
+  const canDelete = useHasPermission("workspace:delete");
+  const remove = useDeleteWorkspace(tid);
 
   if (isLoading) return <p className="p-6 text-muted-foreground">Loading…</p>;
-  if (isError || !data)
-    return <p className="p-6 text-destructive">Tenant not found.</p>;
+  if (!workspace)
+    return <p className="p-6 text-destructive">Workspace not found.</p>;
 
   return (
-    <section className="p-6" data-testid="tenant-detail-page">
+    <section className="p-6" data-testid="workspace-detail-page">
       <header className="mb-4">
         <Link
-          href="/admin/tenants"
+          href="/admin/workspaces"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← Tenants
+          ← Workspaces
         </Link>
         <div className="mt-1 flex items-center gap-2">
-          <h1 className="text-xl font-semibold">{data.name}</h1>
+          <h1 className="text-xl font-semibold">{workspace.name}</h1>
           {canUpdate && (
             <Button
               size="sm"
               variant="ghost"
-              data-testid="tenant-rename-btn"
+              data-testid="workspace-rename-btn"
               onClick={() => setRenameOpen(true)}
             >
               Rename
@@ -75,45 +80,48 @@ function Inner({ id }: { id: number }) {
             <InlineConfirm
               label="Delete"
               onConfirm={async () => {
-                await remove.mutateAsync(data.id);
-                router.push("/admin/tenants");
+                await remove.mutateAsync(workspace.id);
+                router.push("/admin/workspaces");
               }}
               pending={remove.isPending}
-              triggerTestId="tenant-delete-btn"
-              confirmTestId="tenant-delete-confirm-btn"
+              triggerTestId="workspace-delete-btn"
+              confirmTestId="workspace-delete-confirm-btn"
             />
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          <code>/{data.slug}</code> · #{data.id}
+          <code>/{workspace.slug}</code> · #{workspace.id}
         </p>
       </header>
       <dl className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt className="text-muted-foreground">Plan</dt>
-          <dd>{data.plan}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Status</dt>
-          <dd>{data.status === 1 ? "active" : "disabled"}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Workspaces</dt>
-          <dd>{data.workspace_count}</dd>
-        </div>
-        <div>
           <dt className="text-muted-foreground">Members</dt>
-          <dd>{data.member_count}</dd>
+          <dd>{workspace.member_count}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Created</dt>
-          <dd>{data.created_at?.slice(0, 10) ?? "—"}</dd>
+          <dd>{workspace.created_at?.slice(0, 10) ?? "—"}</dd>
         </div>
+        {workspace.description && (
+          <div className="col-span-2">
+            <dt className="text-muted-foreground">Description</dt>
+            <dd>{workspace.description}</dd>
+          </div>
+        )}
       </dl>
-      {renameOpen && (
-        <RenameTenantDialog
-          tenantId={data.id}
-          initialName={data.name}
+      <div className="mt-4">
+        <Link
+          href={`/admin/workspaces/${workspace.id}/members`}
+          className="text-sm underline"
+        >
+          Manage members →
+        </Link>
+      </div>
+      {renameOpen && tid && (
+        <RenameWorkspaceDialog
+          tenantId={tid}
+          wsId={workspace.id}
+          initialName={workspace.name}
           onClose={() => setRenameOpen(false)}
         />
       )}
@@ -121,18 +129,20 @@ function Inner({ id }: { id: number }) {
   );
 }
 
-function RenameTenantDialog({
+function RenameWorkspaceDialog({
   tenantId,
+  wsId,
   initialName,
   onClose,
 }: {
   tenantId: number;
+  wsId: number;
   initialName: string;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initialName);
   const [error, setError] = useState<string | null>(null);
-  const patch = useUpdateTenant(tenantId);
+  const patch = useUpdateWorkspace(tenantId, wsId);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,22 +151,22 @@ function RenameTenantDialog({
       await patch.mutateAsync({ name: name.trim() });
       onClose();
     } catch (err) {
-      setError((err as Error).message || "Failed to rename tenant");
+      setError((err as Error).message || "Failed to rename workspace");
     }
   };
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent data-testid="tenant-rename-dialog">
+      <DialogContent data-testid="workspace-rename-dialog">
         <DialogHeader>
-          <DialogTitle>Rename tenant</DialogTitle>
+          <DialogTitle>Rename workspace</DialogTitle>
           <DialogDescription>
             The display name can be changed freely; the slug is permanent.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
           <Input
-            data-testid="tenant-rename-name"
+            data-testid="workspace-rename-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -164,7 +174,7 @@ function RenameTenantDialog({
           {error && (
             <p
               className="text-sm text-destructive"
-              data-testid="tenant-rename-error"
+              data-testid="workspace-rename-error"
             >
               {error}
             </p>
@@ -174,13 +184,13 @@ function RenameTenantDialog({
               type="button"
               variant="ghost"
               onClick={onClose}
-              data-testid="tenant-rename-cancel"
+              data-testid="workspace-rename-cancel"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              data-testid="tenant-rename-submit"
+              data-testid="workspace-rename-submit"
               disabled={patch.isPending}
             >
               {patch.isPending ? "Saving…" : "Save"}
