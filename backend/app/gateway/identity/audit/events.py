@@ -87,6 +87,8 @@ KNOWN_ACTIONS: frozenset[str] = frozenset(
         "skill.installed",
         "skill.published",
         "skill.removed",
+        "skill.review.approved",
+        "skill.review.rejected",
         "tool.called",
         "tool.denied",
         "tool.failed",

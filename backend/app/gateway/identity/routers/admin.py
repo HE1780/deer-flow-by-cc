@@ -482,3 +482,220 @@ async def revoke_org_key(
             pass
 
     return {"status": "revoked"}
+
+
+# ---------------------------------------------------------------------------
+# Skill approval workflow (Task 5.4)
+# ---------------------------------------------------------------------------
+
+
+class RejectSkillIn(BaseModel):
+    reason: str = ""
+
+
+@router.get(
+    "/api/admin/skills/pending",
+    dependencies=[Depends(requires("skill:manage", "platform"))],
+)
+async def list_pending_skills(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """List skills with status='pending_review'."""
+    stmt = text(
+        """
+        SELECT id, name, version, scope, status, created_at, created_by, storage_path
+        FROM identity.skill_registry
+        WHERE status = 'pending_review'
+        ORDER BY created_at ASC
+        """
+    )
+    result = await session.execute(stmt)
+    rows = result.mappings().all()
+    return {
+        "skills": [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "version": r["version"],
+                "scope": r["scope"],
+                "status": r["status"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                "created_by": r["created_by"],
+                "storage_path": r["storage_path"],
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post(
+    "/api/admin/skills/{skill_id}/approve",
+    dependencies=[Depends(requires("skill:manage", "platform"))],
+)
+async def approve_skill(
+    skill_id: int,
+    request: Request,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Approve a pending skill: set status='active', reviewed_by, reviewed_at."""
+    # Verify skill exists and is pending
+    check = await session.execute(
+        text("SELECT id, name, version, scope, status FROM identity.skill_registry WHERE id = :id"),
+        {"id": skill_id},
+    )
+    row = check.mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="skill not found")
+    if row["status"] != "pending_review":
+        raise HTTPException(status_code=409, detail=f"skill status is '{row['status']}', expected 'pending_review'")
+
+    now = datetime.now(UTC)
+    await session.execute(
+        text(
+            """
+            UPDATE identity.skill_registry
+            SET status = 'active', reviewed_by = :reviewed_by, reviewed_at = :reviewed_at
+            WHERE id = :id
+            """
+        ),
+        {"reviewed_by": identity.user_id, "reviewed_at": now, "id": skill_id},
+    )
+
+    # Set is_default=true if this (name, scope) has no other active version
+    default_check = await session.execute(
+        text(
+            """
+            SELECT id FROM identity.skill_registry
+            WHERE name = :name AND scope = :scope AND status = 'active' AND id != :id
+            LIMIT 1
+            """
+        ),
+        {"name": row["name"], "scope": row["scope"], "id": skill_id},
+    )
+    if default_check.fetchone() is None:
+        # No other active version → mark this one as default
+        await session.execute(
+            text("UPDATE identity.skill_registry SET is_default = true WHERE id = :id"),
+            {"id": skill_id},
+        )
+
+    await session.commit()
+
+    # Emit audit event (best-effort)
+    writer = getattr(getattr(request.app, "state", None), "audit_writer", None)
+    if writer is not None:
+        try:
+            await writer.enqueue(
+                AuditEvent(
+                    action="skill.review.approved",
+                    result="success",
+                    tenant_id=identity.tenant_id,
+                    user_id=identity.user_id,
+                    resource_type="skill",
+                    resource_id=str(skill_id),
+                    metadata={"name": row["name"], "version": row["version"], "scope": row["scope"]},
+                ),
+                critical=False,
+            )
+        except Exception:
+            pass
+
+    return {"status": "active", "skill_id": skill_id}
+
+
+@router.post(
+    "/api/admin/skills/{skill_id}/reject",
+    dependencies=[Depends(requires("skill:manage", "platform"))],
+)
+async def reject_skill(
+    skill_id: int,
+    body: RejectSkillIn,
+    request: Request,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Reject a pending skill: set status='rejected', rejection_reason, reviewed_by, reviewed_at."""
+    check = await session.execute(
+        text("SELECT id, name, version, scope, status FROM identity.skill_registry WHERE id = :id"),
+        {"id": skill_id},
+    )
+    row = check.mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="skill not found")
+    if row["status"] != "pending_review":
+        raise HTTPException(status_code=409, detail=f"skill status is '{row['status']}', expected 'pending_review'")
+
+    now = datetime.now(UTC)
+    await session.execute(
+        text(
+            """
+            UPDATE identity.skill_registry
+            SET status = 'rejected',
+                rejection_reason = :reason,
+                reviewed_by = :reviewed_by,
+                reviewed_at = :reviewed_at
+            WHERE id = :id
+            """
+        ),
+        {"reason": body.reason, "reviewed_by": identity.user_id, "reviewed_at": now, "id": skill_id},
+    )
+    await session.commit()
+
+    # Emit audit event (best-effort)
+    writer = getattr(getattr(request.app, "state", None), "audit_writer", None)
+    if writer is not None:
+        try:
+            await writer.enqueue(
+                AuditEvent(
+                    action="skill.review.rejected",
+                    result="success",
+                    tenant_id=identity.tenant_id,
+                    user_id=identity.user_id,
+                    resource_type="skill",
+                    resource_id=str(skill_id),
+                    metadata={"name": row["name"], "version": row["version"], "scope": row["scope"], "reason": body.reason},
+                ),
+                critical=False,
+            )
+        except Exception:
+            pass
+
+    return {"status": "rejected", "skill_id": skill_id}
+
+
+@router.get(
+    "/api/skills/{skill_name}/review-status",
+)
+async def get_skill_review_status(
+    skill_name: str,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Return the review status of a skill. Only the skill creator can query this."""
+    stmt = await session.execute(
+        text(
+            """
+            SELECT id, name, version, scope, status, rejection_reason, created_by
+            FROM identity.skill_registry
+            WHERE name = :name
+            ORDER BY created_at DESC
+            LIMIT 1
+            """
+        ),
+        {"name": skill_name},
+    )
+    row = stmt.mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="skill not found")
+
+    # Only the creator or a user with skill:manage can view
+    if row["created_by"] != identity.user_id and not identity.has_permission("skill:manage"):
+        raise HTTPException(status_code=403, detail="access denied")
+
+    return {
+        "name": row["name"],
+        "version": row["version"],
+        "status": row["status"],
+        "rejection_reason": row["rejection_reason"],
+    }
