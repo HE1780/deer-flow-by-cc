@@ -95,6 +95,8 @@ KNOWN_ACTIONS: frozenset[str] = frozenset(
         "workflow.started",
         "workflow.completed",
         "workflow.failed",
+        # --- org API key lifecycle ---
+        "org_key.auto_rotated",
         # --- platform-side migration / retention ---
         "system.migration.item.moved",
         "system.migration.completed",
