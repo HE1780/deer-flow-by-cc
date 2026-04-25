@@ -20,6 +20,7 @@ Status:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import textwrap
@@ -30,9 +31,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from app.gateway.identity.audit.events import AuditEvent
 from app.gateway.identity.auth.identity import Identity
 from app.gateway.identity.auth.runtime import get_runtime
 from app.gateway.identity.rbac.decorator import requires
+from app.gateway.identity.storage.path_guard import assert_within_tenant_root
 from app.gateway.identity.storage.paths import deerflow_home
 
 logger = logging.getLogger(__name__)
@@ -177,7 +180,6 @@ class PublishSkillResponse(BaseModel):
         A row is inserted in ``identity.skill_registry``.
         An audit event ``skill.published`` is emitted.
     """),
-    dependencies=[Depends(requires("skill:publish", "platform"))],
 )
 async def publish_skill(
     body: PublishSkillRequest,
@@ -198,6 +200,10 @@ async def publish_skill(
 
     # --- 2. Resolve storage path ---
     skill_dir = _skill_storage_path(scope, name, version, tenant_id=tenant_id, user_id=user_id)
+
+    # --- 2.5. Path traversal guard ---
+    if tenant_id is not None:
+        assert_within_tenant_root(skill_dir, tenant_id)
 
     # --- 3. DB: check for duplicate (name, version) ---
     rt = get_runtime()
@@ -262,8 +268,6 @@ async def publish_skill(
     writer = getattr(getattr(request.app, "state", None), "audit_writer", None)
     if writer is not None:
         try:
-            from app.gateway.identity.audit.events import AuditEvent
-
             ev = AuditEvent(
                 action="skill.published",
                 result="success",
@@ -280,8 +284,6 @@ async def publish_skill(
                     "storage_path": str(skill_dir),
                 },
             )
-            import asyncio
-
             asyncio.create_task(writer.enqueue(ev, critical=False))
         except Exception:
             logger.debug("audit enqueue from skill.published failed", exc_info=True)
