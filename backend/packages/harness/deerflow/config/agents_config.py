@@ -36,8 +36,12 @@ class AgentConfig(BaseModel):
     # skills controls which skills are loaded into the agent's prompt:
     # - None (or omitted): load all enabled skills (default fallback behavior)
     # - [] (explicit empty list): disable all skills
-    # - ["skill1", "skill2"]: load only the specified skills
+    # - ["skill1", "skill2"] or ["skill1@v1.2.0"]: load only the specified skills (version optional)
     skills: list[str] | None = None
+    # org_key_env: name of the env var holding the org API key.
+    # When set, the key is read at runtime and injected into skill env declarations
+    # that have source="org_key".
+    org_key_env: str | None = None
 
 
 def load_agent_config(name: str | None) -> AgentConfig | None:

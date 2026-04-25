@@ -1,4 +1,5 @@
 import logging
+import os
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
@@ -17,7 +18,8 @@ from deerflow.agents.middlewares.token_usage_middleware import TokenUsageMiddlew
 from deerflow.agents.middlewares.tool_error_handling_middleware import build_lead_runtime_middlewares
 from deerflow.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from deerflow.agents.thread_state import ThreadState
-from deerflow.config.agents_config import load_agent_config, validate_agent_name
+from deerflow.config.agents_config import AgentConfig, load_agent_config, validate_agent_name
+from deerflow.skills.manifest import load_skill_manifest_by_name, parse_skill_spec
 from deerflow.config.app_config import get_app_config
 from deerflow.config.memory_config import get_memory_config
 from deerflow.config.summarization_config import get_summarization_config
@@ -202,6 +204,51 @@ Being proactive with task management demonstrates thoroughness and ensures all r
     return TodoMiddleware(system_prompt=system_prompt, tool_description=tool_description)
 
 
+def _resolve_skills_and_deps(
+    agent_config: AgentConfig,
+) -> tuple[set[str], list[str], dict[str, str]]:
+    """Resolve skill specs to names, extra tool_groups, and env injections.
+
+    Returns:
+        (skill_names, extra_tool_groups, env_injections)
+        - skill_names: set of skill name strings (stripped of @version suffix)
+        - extra_tool_groups: deduplicated list of tool groups from manifests
+        - env_injections: dict of env var name → value to inject into skill context
+    """
+    if not agent_config.skills:
+        return set(), [], {}
+
+    skill_names: set[str] = set()
+    extra_tool_groups: list[str] = []
+    env_injections: dict[str, str] = {}
+
+    org_key_value: str | None = None
+    if agent_config.org_key_env:
+        org_key_value = os.environ.get(agent_config.org_key_env)
+
+    seen_tools: set[str] = set()
+
+    for spec in agent_config.skills:
+        name, version = parse_skill_spec(spec)
+        skill_names.add(name)
+
+        manifest = load_skill_manifest_by_name(name, version)
+        if manifest is None:
+            continue
+
+        for tool in manifest.requires_tools:
+            if tool not in seen_tools:
+                extra_tool_groups.append(tool)
+                seen_tools.add(tool)
+
+        if org_key_value:
+            for env_decl in manifest.env:
+                if env_decl.source == "org_key":
+                    env_injections[env_decl.name] = org_key_value
+
+    return skill_names, extra_tool_groups, env_injections
+
+
 # ThreadDataMiddleware must be before SandboxMiddleware to ensure thread_id is available
 # UploadsMiddleware should be after ThreadDataMiddleware to access thread_id
 # DanglingToolCallMiddleware patches missing ToolMessages before model sees the history
@@ -346,13 +393,28 @@ def make_lead_agent(config: RunnableConfig):
             state_schema=ThreadState,
         )
 
-    # Default lead agent (unchanged behavior)
+    # Resolve skill version pins and manifest-declared dependencies
+    skill_names, extra_tool_groups, _env_injections = (
+        _resolve_skills_and_deps(agent_config) if agent_config and agent_config.skills is not None
+        else (None, [], {})
+    )
+
+    merged_tool_groups = (agent_config.tool_groups or []) + extra_tool_groups if agent_config else None
+    if not merged_tool_groups:
+        merged_tool_groups = None
+
+    # Default lead agent
     return create_agent(
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
-        tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
+        tools=get_available_tools(model_name=model_name, groups=merged_tool_groups, subagent_enabled=subagent_enabled),
         middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
         system_prompt=apply_prompt_template(
-            subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name, available_skills=set(agent_config.skills) if agent_config and agent_config.skills is not None else None
+            subagent_enabled=subagent_enabled,
+            max_concurrent_subagents=max_concurrent_subagents,
+            agent_name=agent_name,
+            available_skills=skill_names if skill_names is not None else (
+                set(agent_config.skills) if agent_config and agent_config.skills is not None else None
+            ),
         ),
         state_schema=ThreadState,
     )
