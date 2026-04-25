@@ -30,6 +30,7 @@ from app.gateway.identity.routers import internal as identity_internal_router
 from app.gateway.identity.routers import me as identity_me_router
 from app.gateway.identity.routers import metrics as identity_metrics_router
 from app.gateway.identity.routers import roles as identity_roles_router
+from app.gateway.identity.routers import skills_publish as identity_skills_publish_router
 from app.gateway.identity.settings import get_identity_settings
 from app.gateway.routers import (
     agents,
@@ -468,6 +469,8 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
         app.include_router(identity_audit_router.router)
         # M7/C: Prometheus metrics endpoint
         app.include_router(identity_metrics_router.router)
+        # Task 5.2a: skill publish endpoint (requires skill:publish scope)
+        app.include_router(identity_skills_publish_router.router)
         # IdentityMiddleware first → executes innermost (sets state.identity).
         # AuditMiddleware after → executes outermost (sees the resolved
         # identity on the way out + records request duration end-to-end).

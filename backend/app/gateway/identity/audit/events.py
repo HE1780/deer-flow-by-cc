@@ -85,6 +85,7 @@ KNOWN_ACTIONS: frozenset[str] = frozenset(
         "thread.deleted",
         "skill.invoked",
         "skill.installed",
+        "skill.published",
         "skill.removed",
         "tool.called",
         "tool.denied",
