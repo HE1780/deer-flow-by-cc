@@ -397,7 +397,7 @@ Scopes: `"platform"` (permission check only), `"tenant"` (also verifies caller i
 - **Harness tenant-aware paths**: `packages/harness/deerflow/config/paths.py::Paths` gained `resolve_thread_dir`, `resolve_sandbox_{work,uploads,outputs,user_data}_dir`, `resolve_acp_workspace_dir`, `ensure_thread_dirs_for`, and their host-side variants. Legacy methods are untouched so single-tenant callers keep working. `resolve_virtual_path` accepts optional `tenant_id`/`workspace_id` kwargs.
 - **Identity extraction helper**: `packages/harness/deerflow/agents/middlewares/_identity.py::extract_tenant_ids()` is the shared defensive reader for `state["identity"]` — returns `(tenant_id, workspace_id)` only when both are positive ints, otherwise `(None, None)`. Consumed by `ThreadDataMiddleware`, `SandboxMiddleware`, `UploadsMiddleware`, and `present_file_tool`.
 - **Middleware / router consumption**: `ThreadDataMiddleware` and `SandboxMiddleware` read `state["identity"]` and route through the tenant-aware path helpers when the pair is valid. Gateway routers `routers/artifacts.py` and `routers/uploads.py` enforce `assert_within_tenant_root` on every GET/POST/LIST/DELETE; cross-tenant attempts return a generic `403 "Access denied"` (no leak of tenant IDs or filesystem paths). Flag off → legacy flat paths.
-- **Channel identity deferred**: `app/channels/manager.py` still calls `Paths.resolve_virtual_path` without identity. Marked with `TODO(m5-identity)` — IM channel identity threading is tracked for the M5 follow-up pass; the M5 Gateway→LangGraph HMAC propagation work has landed (see below).
+- **Channel identity**: `app/channels/manager.py::_resolve_channel_identity` reads `tenant_id`/`workspace_id` from `channel_sessions.<name>` (falling back to `default_session`) when `ENABLE_IDENTITY=true`. `ChannelManager._create_thread` persists the pair into `ChannelStore` at thread creation time; `_handle_chat` + `_handle_streaming_chat` read them back via `get_thread_mapping` and pass them to `paths.resolve_virtual_path` so IM artifacts land under the tenant-stratified outputs directory. Flag off → both values `None` → legacy single-tenant path preserved.
 
 **LangGraph identity propagation (M5):**
 
@@ -462,7 +462,7 @@ Lifespan attaches the writer + session source to the metrics singleton in `_init
 
 Docs: `docs/UPGRADE_v2.md` (path A greenfield / path B migration), `docs/identity-alerting.md` (sample Prometheus alert rules + Grafana panels), `docs/identity-release-checklist.md` (spec §11.7 manual runbook — IdP smoke tests, 1 000-thread rehearsal, rollback drill), `CHANGELOG.md` (identity release notes).
 
-**Still open for a follow-up session:** M7 Part A (14 admin pages + Playwright E2E) and Part C.8 (GitHub Actions end-to-end smoke — needs OIDC mock IdP infrastructure).
+**Still open for a follow-up session:** None — M7 Part C.8 (GitHub Actions identity E2E smoke) shipped via `.github/workflows/identity-e2e-smoke.yml` (bypasses OIDC by minting an RS256 JWT directly for the bootstrap admin); channel identity TODO resolved via `ChannelStore` persistence of `tenant_id`/`workspace_id` and `Paths.resolve_virtual_path` wiring.
 
 **Roadmap:** M1 – M6 + M7 B (migration) + M7 C (release hardening) shipped. M7 A (admin UI) still open. See `docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md`.
 
@@ -489,7 +489,7 @@ Bridges external messaging platforms (Feishu, Slack, Telegram) to the DeerFlow a
 
 **Components**:
 - `message_bus.py` - Async pub/sub hub (`InboundMessage` → queue → dispatcher; `OutboundMessage` → callbacks → channels)
-- `store.py` - JSON-file persistence mapping `channel_name:chat_id[:topic_id]` → `thread_id` (keys are `channel:chat` for root conversations and `channel:chat:topic` for threaded conversations)
+- `store.py` - JSON-file persistence mapping `channel_name:chat_id[:topic_id]` → `{thread_id, tenant_id, workspace_id, user_id, ...}` (keys are `channel:chat` for root conversations and `channel:chat:topic` for threaded conversations). When `ENABLE_IDENTITY` is off (or channel config omits the pair), `tenant_id`/`workspace_id` are stored as `null` and resolvers fall back to the legacy flat path.
 - `manager.py` - Core dispatcher: creates threads via `client.threads.create()`, routes commands, keeps Slack/Telegram on `client.runs.wait()`, and uses `client.runs.stream(["messages-tuple", "values"])` for Feishu incremental outbound updates
 - `base.py` - Abstract `Channel` base class (start/stop/send lifecycle)
 - `service.py` - Manages lifecycle of all configured channels from `config.yaml`
