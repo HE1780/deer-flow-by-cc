@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
@@ -17,6 +18,7 @@ import {
   MESSAGE_LIST_FOLLOWUPS_EXTRA_PADDING_BOTTOM,
 } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
+import { SkillBadgeBar } from "@/components/workspace/skill-badge-bar";
 import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
 import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
@@ -25,6 +27,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import { useModels } from "@/core/models/hooks";
 import { useNotification } from "@/core/notification/hooks";
 import { useThreadSettings } from "@/core/settings";
+import { useBindSkill, useBoundSkills } from "@/core/skills/hooks";
 import { useThreadStream } from "@/core/threads/hooks";
 import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
@@ -39,6 +42,19 @@ export default function ChatPage() {
   const [mounted, setMounted] = useState(false);
   const { tokenUsageEnabled } = useModels();
   useSpecificChatMode();
+
+  const { boundSkills } = useBoundSkills(threadId);
+  const { mutate: bindSkill } = useBindSkill(threadId);
+  const searchParams = useSearchParams();
+
+  // Auto-bind skill from URL param after thread is known (e.g. navigated from skills square)
+  useEffect(() => {
+    const skillName = searchParams.get("bind_skill");
+    const skillVersion = searchParams.get("bind_version") ?? "latest";
+    if (skillName && !isNewThread && threadId) {
+      bindSkill({ skillName, version: skillVersion });
+    }
+  }, [isNewThread, threadId, searchParams, bindSkill]);
 
   useEffect(() => {
     setMounted(true);
@@ -159,7 +175,14 @@ export default function ChatPage() {
                     }
                     context={settings.context}
                     extraHeader={
-                      isNewThread && <Welcome mode={settings.context.mode} />
+                      isNewThread ? (
+                        <Welcome mode={settings.context.mode} />
+                      ) : boundSkills.length > 0 ? (
+                        <SkillBadgeBar
+                          threadId={threadId}
+                          boundSkills={boundSkills}
+                        />
+                      ) : undefined
                     }
                     disabled={
                       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
