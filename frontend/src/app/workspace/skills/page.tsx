@@ -7,6 +7,7 @@ import {
   TerminalIcon,
   UploadIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,8 +30,12 @@ import type { Skill } from "@/core/skills/type";
 // ---------------------------------------------------------------------------
 
 function SkillCard({ skill }: { skill: Skill }) {
+  const router = useRouter();
+
   const handleLoad = () => {
-    toast.success("技能已加载到会话");
+    router.push(
+      `/workspace/chats/new?bind_skill=${encodeURIComponent(skill.name)}&bind_version=latest`,
+    );
   };
 
   return (
