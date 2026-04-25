@@ -329,12 +329,22 @@ def _format_artifact_text(artifacts: list[str]) -> str:
 _OUTPUTS_VIRTUAL_PREFIX = "/mnt/user-data/outputs/"
 
 
-def _resolve_attachments(thread_id: str, artifacts: list[str]) -> list[ResolvedAttachment]:
+def _resolve_attachments(
+    thread_id: str,
+    artifacts: list[str],
+    *,
+    tenant_id: int | None = None,
+    workspace_id: int | None = None,
+) -> list[ResolvedAttachment]:
     """Resolve virtual artifact paths to host filesystem paths with metadata.
 
     Only paths under ``/mnt/user-data/outputs/`` are accepted; any other
     virtual path is rejected with a warning to prevent exfiltrating uploads
     or workspace files via IM channels.
+
+    When ``tenant_id`` / ``workspace_id`` are supplied (M4 identity on),
+    :func:`Paths.resolve_virtual_path` routes to the tenant-stratified layout;
+    when absent, the legacy single-tenant path is used.
 
     Skips artifacts that cannot be resolved (missing files, invalid paths)
     and logs warnings for them.
@@ -350,11 +360,12 @@ def _resolve_attachments(thread_id: str, artifacts: list[str]) -> list[ResolvedA
             logger.warning("[Manager] rejected non-outputs artifact path: %s", virtual_path)
             continue
         try:
-            # TODO(m5-identity): thread identity through to the channel resolver so
-            # tenant-stratified paths are honoured here. For M4 the inbound-message
-            # pipeline has no resolved Identity (channel auth is platform-specific),
-            # so we keep the legacy single-tenant path — behaviour preserved exactly.
-            actual = paths.resolve_virtual_path(thread_id, virtual_path)
+            actual = paths.resolve_virtual_path(
+                thread_id,
+                virtual_path,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
             # Verify the resolved path is actually under the outputs directory
             # (guards against path-traversal even after prefix check)
             try:
@@ -386,13 +397,21 @@ def _prepare_artifact_delivery(
     thread_id: str,
     response_text: str,
     artifacts: list[str],
+    *,
+    tenant_id: int | None = None,
+    workspace_id: int | None = None,
 ) -> tuple[str, list[ResolvedAttachment]]:
     """Resolve attachments and append filename fallbacks to the text response."""
     attachments: list[ResolvedAttachment] = []
     if not artifacts:
         return response_text, attachments
 
-    attachments = _resolve_attachments(thread_id, artifacts)
+    attachments = _resolve_attachments(
+        thread_id,
+        artifacts,
+        tenant_id=tenant_id,
+        workspace_id=workspace_id,
+    )
     resolved_virtuals = {attachment.virtual_path for attachment in attachments}
     unresolved = [path for path in artifacts if path not in resolved_virtuals]
 
@@ -698,29 +717,44 @@ class ChannelManager:
         """Create a new thread on the LangGraph Server and store the mapping."""
         thread = await client.threads.create()
         thread_id = thread["thread_id"]
+        tenant_id, workspace_id = self._resolve_channel_identity(msg)
         self.store.set_thread_id(
             msg.channel_name,
             msg.chat_id,
             thread_id,
             topic_id=msg.topic_id,
             user_id=msg.user_id,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
         )
-        logger.info("[Manager] new thread created on LangGraph Server: thread_id=%s for chat_id=%s topic_id=%s", thread_id, msg.chat_id, msg.topic_id)
+        logger.info(
+            "[Manager] new thread created on LangGraph Server: thread_id=%s for chat_id=%s topic_id=%s tenant_id=%s workspace_id=%s",
+            thread_id,
+            msg.chat_id,
+            msg.topic_id,
+            tenant_id,
+            workspace_id,
+        )
         return thread_id
 
     async def _handle_chat(self, msg: InboundMessage, extra_context: dict[str, Any] | None = None) -> None:
         client = self._get_client()
 
-        # Look up existing DeerFlow thread.
-        # topic_id may be None (e.g. Telegram private chats) — the store
-        # handles this by using the "channel:chat_id" key without a topic suffix.
-        thread_id = self.store.get_thread_id(msg.channel_name, msg.chat_id, topic_id=msg.topic_id)
-        if thread_id:
+        # Look up existing DeerFlow thread mapping — includes tenant/workspace
+        # when M4+ identity is on. ``None`` for both when flag is off.
+        mapping = self.store.get_thread_mapping(msg.channel_name, msg.chat_id, topic_id=msg.topic_id)
+        if mapping is not None:
+            thread_id = mapping["thread_id"]
+            tenant_id = mapping.get("tenant_id")
+            workspace_id = mapping.get("workspace_id")
             logger.info("[Manager] reusing thread: thread_id=%s for topic_id=%s", thread_id, msg.topic_id)
-
-        # No existing thread found — create a new one
-        if thread_id is None:
+        else:
             thread_id = await self._create_thread(client, msg)
+            # _create_thread has now written the mapping — read it back so we
+            # use the exact same pair the store persisted.
+            mapping = self.store.get_thread_mapping(msg.channel_name, msg.chat_id, topic_id=msg.topic_id) or {}
+            tenant_id = mapping.get("tenant_id")
+            workspace_id = mapping.get("workspace_id")
 
         assistant_id, run_config, run_context = self._resolve_run_params(msg, thread_id)
 
@@ -750,6 +784,8 @@ class ChannelManager:
                 assistant_id,
                 run_config,
                 run_context,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
             )
             return
 
@@ -772,7 +808,13 @@ class ChannelManager:
             len(artifacts),
         )
 
-        response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts)
+        response_text, attachments = _prepare_artifact_delivery(
+            thread_id,
+            response_text,
+            artifacts,
+            tenant_id=tenant_id,
+            workspace_id=workspace_id,
+        )
 
         if not response_text:
             if attachments:
@@ -800,6 +842,9 @@ class ChannelManager:
         assistant_id: str,
         run_config: dict[str, Any],
         run_context: dict[str, Any],
+        *,
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
     ) -> None:
         logger.info("[Manager] invoking runs.stream(thread_id=%s, text=%r)", thread_id, msg.text[:100])
 
@@ -863,7 +908,13 @@ class ChannelManager:
             result = last_values if last_values is not None else {"messages": [{"type": "ai", "content": latest_text}]}
             response_text = _extract_response_text(result)
             artifacts = _extract_artifacts(result)
-            response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts)
+            response_text, attachments = _prepare_artifact_delivery(
+                thread_id,
+                response_text,
+                artifacts,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
+            )
 
             if not response_text:
                 if attachments:
@@ -916,12 +967,15 @@ class ChannelManager:
             client = self._get_client()
             thread = await client.threads.create()
             new_thread_id = thread["thread_id"]
+            tenant_id, workspace_id = self._resolve_channel_identity(msg)
             self.store.set_thread_id(
                 msg.channel_name,
                 msg.chat_id,
                 new_thread_id,
                 topic_id=msg.topic_id,
                 user_id=msg.user_id,
+                tenant_id=tenant_id,
+                workspace_id=workspace_id,
             )
             reply = "New conversation started."
         elif command == "status":

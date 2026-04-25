@@ -2554,3 +2554,119 @@ class TestChannelManagerIdentity:
         tid, wid = manager._resolve_channel_identity(msg)
         assert tid is None
         assert wid is None
+
+    def test_handle_chat_persists_tenant_workspace_into_store(self, monkeypatch):
+        """When flag is on + channel config has the pair, set_thread_id stores them."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setenv("ENABLE_IDENTITY", "1")
+
+        async def go():
+            bus = MessageBus()
+            store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+            manager = ChannelManager(
+                bus=bus,
+                store=store,
+                channel_sessions={"telegram": {"tenant_id": 7, "workspace_id": 3}},
+            )
+
+            mock_client = _make_mock_langgraph_client()
+            manager._client = mock_client
+
+            outbound_received = []
+
+            async def capture(msg):
+                outbound_received.append(msg)
+
+            bus.subscribe_outbound(capture)
+            await manager.start()
+
+            await bus.publish_inbound(
+                InboundMessage(channel_name="telegram", chat_id="chat1", user_id="u1", text="hi")
+            )
+            await _wait_for(lambda: len(outbound_received) >= 1)
+            await manager.stop()
+
+            mapping = store.get_thread_mapping("telegram", "chat1")
+            assert mapping is not None
+            assert mapping["tenant_id"] == 7
+            assert mapping["workspace_id"] == 3
+
+        _run(go())
+
+    def test_resolve_attachments_flag_off_passes_none(self, monkeypatch):
+        """Flag off → paths.resolve_virtual_path called with tenant_id=None, workspace_id=None."""
+        from app.channels.manager import _resolve_attachments
+
+        monkeypatch.delenv("ENABLE_IDENTITY", raising=False)
+
+        fake_paths = MagicMock()
+        fake_paths.sandbox_outputs_dir.return_value = Path("/tmp/outputs")
+
+        resolved_path = MagicMock()
+        resolved_path.resolve.return_value = resolved_path
+        resolved_path.relative_to.return_value = Path("file.txt")
+        resolved_path.is_file.return_value = True
+        resolved_path.stat.return_value = SimpleNamespace(st_size=10)
+        resolved_path.name = "file.txt"
+        fake_paths.resolve_virtual_path.return_value = resolved_path
+
+        class _Stub:
+            def get_paths(self):
+                return fake_paths
+
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "deerflow.config.paths",
+            _Stub(),
+        )
+
+        attachments = _resolve_attachments(
+            "thread-xyz",
+            ["/mnt/user-data/outputs/file.txt"],
+            tenant_id=None,
+            workspace_id=None,
+        )
+
+        fake_paths.resolve_virtual_path.assert_called_once()
+        _, kwargs = fake_paths.resolve_virtual_path.call_args
+        assert kwargs.get("tenant_id") is None
+        assert kwargs.get("workspace_id") is None
+        assert len(attachments) == 1
+
+    def test_resolve_attachments_flag_on_passes_ids(self, monkeypatch):
+        """Flag on + IDs supplied → paths.resolve_virtual_path gets the IDs as kwargs."""
+        from app.channels.manager import _resolve_attachments
+
+        fake_paths = MagicMock()
+        fake_paths.sandbox_outputs_dir.return_value = Path("/tmp/outputs")
+
+        resolved_path = MagicMock()
+        resolved_path.resolve.return_value = resolved_path
+        resolved_path.relative_to.return_value = Path("file.txt")
+        resolved_path.is_file.return_value = True
+        resolved_path.stat.return_value = SimpleNamespace(st_size=42)
+        resolved_path.name = "file.txt"
+        fake_paths.resolve_virtual_path.return_value = resolved_path
+
+        class _Stub:
+            def get_paths(self):
+                return fake_paths
+
+        monkeypatch.setitem(
+            __import__("sys").modules,
+            "deerflow.config.paths",
+            _Stub(),
+        )
+
+        _resolve_attachments(
+            "thread-xyz",
+            ["/mnt/user-data/outputs/file.txt"],
+            tenant_id=7,
+            workspace_id=3,
+        )
+
+        fake_paths.resolve_virtual_path.assert_called_once()
+        _, kwargs = fake_paths.resolve_virtual_path.call_args
+        assert kwargs.get("tenant_id") == 7
+        assert kwargs.get("workspace_id") == 3
