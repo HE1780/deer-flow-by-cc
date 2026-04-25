@@ -178,9 +178,7 @@ def test_assert_within_tenant_root_sibling_tenant_rejected(tmp_path, monkeypatch
     assert "7" in str(excinfo.value)
 
 
-def test_assert_within_tenant_root_parent_traversal_normalised_inside(
-    tmp_path, monkeypatch
-):
+def test_assert_within_tenant_root_parent_traversal_normalised_inside(tmp_path, monkeypatch):
     """A path with '..' that resolves back inside the tenant root is OK."""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
     root = _mk_tenant(tmp_path, 7)

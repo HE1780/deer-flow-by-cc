@@ -83,15 +83,9 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         is missing or non-positive.
         """
         return {
-            "workspace_path": str(
-                self._paths.resolve_sandbox_work_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-            ),
-            "uploads_path": str(
-                self._paths.resolve_sandbox_uploads_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-            ),
-            "outputs_path": str(
-                self._paths.resolve_sandbox_outputs_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-            ),
+            "workspace_path": str(self._paths.resolve_sandbox_work_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)),
+            "uploads_path": str(self._paths.resolve_sandbox_uploads_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)),
+            "outputs_path": str(self._paths.resolve_sandbox_outputs_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)),
         }
 
     def _create_thread_directories(

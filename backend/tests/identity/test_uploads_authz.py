@@ -106,9 +106,7 @@ def test_flag_off_upload_uses_legacy_layout(isolated_home, flag_off):
         r = _upload(client, "t1", "hello.txt", b"legacy")
     assert r.status_code == 200, r.text
 
-    legacy_file = (
-        isolated_home / "threads" / "t1" / "user-data" / "uploads" / "hello.txt"
-    )
+    legacy_file = isolated_home / "threads" / "t1" / "user-data" / "uploads" / "hello.txt"
     assert legacy_file.exists()
     assert legacy_file.read_bytes() == b"legacy"
     # Tenant tree must NOT exist when flag is off.
@@ -126,9 +124,7 @@ def test_flag_off_list_and_delete_use_legacy_layout(isolated_home, flag_off):
     assert r_list.json()["count"] == 1
     assert r_del.status_code == 200
 
-    legacy_file = (
-        isolated_home / "threads" / "t1" / "user-data" / "uploads" / "hello.txt"
-    )
+    legacy_file = isolated_home / "threads" / "t1" / "user-data" / "uploads" / "hello.txt"
     assert not legacy_file.exists()
 
 
@@ -144,18 +140,7 @@ def test_flag_on_same_tenant_upload_lands_in_tenant_path(isolated_home, flag_on)
         r = _upload(client, "t1", "hello.txt", b"scoped")
     assert r.status_code == 200, r.text
 
-    tenant_file = (
-        isolated_home
-        / "tenants"
-        / "5"
-        / "workspaces"
-        / "7"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "uploads"
-        / "hello.txt"
-    )
+    tenant_file = isolated_home / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "uploads" / "hello.txt"
     assert tenant_file.exists()
     assert tenant_file.read_bytes() == b"scoped"
     # Legacy tree must NOT be created.
@@ -194,30 +179,8 @@ def test_flag_on_same_tenant_delete_only_removes_own_file(isolated_home, flag_on
         r_del = c_b.delete("/api/threads/t1/uploads/shared_name.txt")
     assert r_del.status_code == 200, r_del.text
 
-    file_a = (
-        isolated_home
-        / "tenants"
-        / "5"
-        / "workspaces"
-        / "7"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "uploads"
-        / "shared_name.txt"
-    )
-    file_b = (
-        isolated_home
-        / "tenants"
-        / "99"
-        / "workspaces"
-        / "1"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "uploads"
-        / "shared_name.txt"
-    )
+    file_a = isolated_home / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "uploads" / "shared_name.txt"
+    file_b = isolated_home / "tenants" / "99" / "workspaces" / "1" / "threads" / "t1" / "user-data" / "uploads" / "shared_name.txt"
     # Tenant A's file survives.
     assert file_a.exists()
     assert file_a.read_bytes() == b"owner-A"
@@ -240,17 +203,7 @@ def test_flag_on_delete_traversal_filename_rejected(isolated_home, flag_on):
     app = _make_app(identity=FakeIdentity(tenant_id=5, workspace_ids=(7,)))
 
     # Create the "other" tenant's file that the traversal would target.
-    other_uploads = (
-        isolated_home
-        / "tenants"
-        / "99"
-        / "workspaces"
-        / "1"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "uploads"
-    )
+    other_uploads = isolated_home / "tenants" / "99" / "workspaces" / "1" / "threads" / "t1" / "user-data" / "uploads"
     other_uploads.mkdir(parents=True, exist_ok=True)
     (other_uploads / "loot.txt").write_bytes(b"tenant-99-secret")
 

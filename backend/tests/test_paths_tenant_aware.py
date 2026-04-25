@@ -137,9 +137,7 @@ class TestHostVariants:
         monkeypatch.delenv("DEER_FLOW_HOST_BASE_DIR", raising=False)
         paths = Paths(base_dir=str(tmp_path))
 
-        assert _as_posix(paths.resolve_host_thread_dir("t1", tenant_id=5, workspace_id=7)).endswith(
-            "tenants/5/workspaces/7/threads/t1"
-        )
+        assert _as_posix(paths.resolve_host_thread_dir("t1", tenant_id=5, workspace_id=7)).endswith("tenants/5/workspaces/7/threads/t1")
         assert _as_posix(paths.resolve_host_thread_dir("t1")).endswith("threads/t1")
 
     def test_host_dir_honors_host_base_dir_env(self, tmp_path, monkeypatch):

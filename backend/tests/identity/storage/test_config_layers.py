@@ -69,9 +69,7 @@ def test_tenant_overlay_merges_nested_dict(tmp_path: Path) -> None:
     _write_yaml(global_path, {"foo": 1, "bar": {"x": 10}})
     _write_yaml(_tenant_cfg_path(tmp_path, 5), {"bar": {"y": 20}})
 
-    merged, key = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, key = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     assert merged == {"foo": 1, "bar": {"x": 10, "y": 20}}
     assert key == "global:5"
@@ -88,9 +86,7 @@ def test_workspace_overlay_wins_over_lower_layers(tmp_path: Path) -> None:
     _write_yaml(_tenant_cfg_path(tmp_path, 5), {"scalar": "tenant"})
     _write_yaml(_workspace_cfg_path(tmp_path, 5, 7), {"scalar": "workspace"})
 
-    merged, key = load_layered_config(
-        global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path
-    )
+    merged, key = load_layered_config(global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path)
 
     assert merged["scalar"] == "workspace"
     assert key == "5:7"
@@ -110,9 +106,7 @@ def test_tenant_setting_model_api_key_raises(tmp_path: Path) -> None:
     )
 
     with pytest.raises(SensitiveFieldViolation) as exc_info:
-        load_layered_config(
-            global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-        )
+        load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     msg = str(exc_info.value)
     assert "tenant" in msg
@@ -134,9 +128,7 @@ def test_workspace_setting_sandbox_provisioner_api_key_raises(tmp_path: Path) ->
     )
 
     with pytest.raises(SensitiveFieldViolation) as exc_info:
-        load_layered_config(
-            global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path
-        )
+        load_layered_config(global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path)
 
     msg = str(exc_info.value)
     assert "workspace" in msg
@@ -159,9 +151,7 @@ def test_tenant_may_set_non_sensitive_field_in_model_element(tmp_path: Path) -> 
         {"models": [{"name": "gpt-4", "temperature": 0.7}]},
     )
 
-    merged, _ = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, _ = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     # list-replace semantics: tenant models list wins wholesale, but since
     # that list doesn't contain api_key, no violation raised.
@@ -178,9 +168,7 @@ def test_tenant_list_replaces_global_list(tmp_path: Path) -> None:
     _write_yaml(global_path, {"tools": ["x"]})
     _write_yaml(_tenant_cfg_path(tmp_path, 5), {"tools": ["a", "b"]})
 
-    merged, _ = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, _ = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     assert merged["tools"] == ["a", "b"]
 
@@ -194,9 +182,7 @@ def test_missing_tenant_file_is_silently_skipped(tmp_path: Path) -> None:
     global_path = tmp_path / "global.yaml"
     _write_yaml(global_path, {"foo": 1})
 
-    merged, key = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, key = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     assert merged == {"foo": 1}
     assert key == "global:5"
@@ -215,9 +201,7 @@ def test_empty_tenant_file_is_treated_as_empty_dict(tmp_path: Path) -> None:
     tenant_file.parent.mkdir(parents=True, exist_ok=True)
     tenant_file.write_text("")  # empty file
 
-    merged, _ = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, _ = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     assert merged == {"foo": 1, "bar": 2}
 
@@ -230,9 +214,7 @@ def test_yaml_null_tenant_file_is_treated_as_empty_dict(tmp_path: Path) -> None:
     tenant_file.parent.mkdir(parents=True, exist_ok=True)
     tenant_file.write_text("# just a comment, no data\n")
 
-    merged, _ = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, _ = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
 
     assert merged == {"foo": 1}
 
@@ -254,9 +236,7 @@ def test_cache_key_shape(tmp_path: Path, tid: int | None, wid: int | None, expec
     global_path = tmp_path / "global.yaml"
     _write_yaml(global_path, {"foo": 1})
 
-    _, key = load_layered_config(
-        global_path, tenant_id=tid, workspace_id=wid, deerflow_home=tmp_path
-    )
+    _, key = load_layered_config(global_path, tenant_id=tid, workspace_id=wid, deerflow_home=tmp_path)
     assert key == expected
 
 
@@ -315,9 +295,7 @@ def test_workspace_layer_sets_memory_storage_path_raises(tmp_path: Path) -> None
     )
 
     with pytest.raises(SensitiveFieldViolation) as exc_info:
-        load_layered_config(
-            global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path
-        )
+        load_layered_config(global_path, tenant_id=5, workspace_id=7, deerflow_home=tmp_path)
 
     msg = str(exc_info.value)
     assert "workspace" in msg
@@ -337,9 +315,7 @@ def test_tenant_may_add_new_model_without_api_key(tmp_path: Path) -> None:
         {"models": [{"name": "custom-local", "temperature": 0.5}]},
     )
 
-    merged, _ = load_layered_config(
-        global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path
-    )
+    merged, _ = load_layered_config(global_path, tenant_id=5, workspace_id=None, deerflow_home=tmp_path)
     assert merged["models"] == [{"name": "custom-local", "temperature": 0.5}]
 
 
@@ -357,9 +333,7 @@ def test_merge_config_with_non_mapping_yaml_raises(tmp_path: Path) -> None:
     global_path.write_text("- just\n- a\n- list\n")
 
     with pytest.raises(ValueError, match="must parse to a mapping"):
-        load_layered_config(
-            global_path, tenant_id=None, workspace_id=None, deerflow_home=tmp_path
-        )
+        load_layered_config(global_path, tenant_id=None, workspace_id=None, deerflow_home=tmp_path)
 
 
 def test_sensitive_field_null_value_also_raises() -> None:
@@ -389,6 +363,4 @@ def test_workspace_id_without_tenant_raises(tmp_path: Path) -> None:
     _write_yaml(global_path, {"foo": 1})
 
     with pytest.raises(ValueError, match="workspace_id requires tenant_id"):
-        load_layered_config(
-            global_path, tenant_id=None, workspace_id=7, deerflow_home=tmp_path
-        )
+        load_layered_config(global_path, tenant_id=None, workspace_id=7, deerflow_home=tmp_path)

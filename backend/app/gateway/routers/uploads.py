@@ -171,9 +171,7 @@ async def upload_files(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     _guard_uploads_dir(uploads_dir, thread_id, tid)
-    sandbox_uploads = get_paths().resolve_sandbox_uploads_dir(
-        thread_id, tenant_id=tid, workspace_id=wid
-    )
+    sandbox_uploads = get_paths().resolve_sandbox_uploads_dir(thread_id, tenant_id=tid, workspace_id=wid)
     uploaded_files = []
 
     sandbox_provider = get_sandbox_provider()
@@ -257,9 +255,7 @@ async def list_uploaded_files(thread_id: str, request: Request) -> dict:
     enrich_file_listing(result, thread_id)
 
     # Gateway additionally includes the sandbox-relative path.
-    sandbox_uploads = get_paths().resolve_sandbox_uploads_dir(
-        thread_id, tenant_id=tid, workspace_id=wid
-    )
+    sandbox_uploads = get_paths().resolve_sandbox_uploads_dir(thread_id, tenant_id=tid, workspace_id=wid)
     for f in result["files"]:
         f["path"] = str(sandbox_uploads / f["filename"])
 

@@ -44,11 +44,13 @@ def _build_scan_plan(
         tenant_subtree = skills_path / "tenants" / str(tenant_id)
         plan.append((skills_path / "public", "public", skills_path / "public"))
         plan.append((tenant_subtree / "custom", "custom", tenant_subtree))
-        plan.append((
-            tenant_subtree / "workspaces" / str(workspace_id) / "user",
-            "user",
-            tenant_subtree,
-        ))
+        plan.append(
+            (
+                tenant_subtree / "workspaces" / str(workspace_id) / "user",
+                "user",
+                tenant_subtree,
+            )
+        )
     elif tenant_id is not None:
         # Tenant-only mode: no workspace-user layer.
         tenant_subtree = skills_path / "tenants" / str(tenant_id)
@@ -232,9 +234,7 @@ def load_skills(
 
     skills_by_name: dict[str, Skill] = {}
 
-    for scan_root, category, allowed_realpath_root in _build_scan_plan(
-        skills_path, tenant_id, workspace_id
-    ):
+    for scan_root, category, allowed_realpath_root in _build_scan_plan(skills_path, tenant_id, workspace_id):
         _scan_root(scan_root, category, allowed_realpath_root, skills_by_name)
 
     skills = list(skills_by_name.values())

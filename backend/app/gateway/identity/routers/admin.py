@@ -78,12 +78,8 @@ async def get_tenant(
     tenant = (await session.execute(select(Tenant).where(Tenant.id == tid))).scalar_one_or_none()
     if tenant is None:
         raise HTTPException(status_code=404, detail="tenant not found")
-    member_count = (
-        await session.execute(select(func.count()).select_from(Membership).where(Membership.tenant_id == tid))
-    ).scalar() or 0
-    workspace_count = (
-        await session.execute(select(func.count()).select_from(Workspace).where(Workspace.tenant_id == tid))
-    ).scalar() or 0
+    member_count = (await session.execute(select(func.count()).select_from(Membership).where(Membership.tenant_id == tid))).scalar() or 0
+    workspace_count = (await session.execute(select(func.count()).select_from(Workspace).where(Workspace.tenant_id == tid))).scalar() or 0
     return {
         **_tenant_row(tenant),
         "member_count": int(member_count),
@@ -114,24 +110,12 @@ async def list_users(
     limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    u_stmt = (
-        select(User)
-        .join(Membership, Membership.user_id == User.id)
-        .where(Membership.tenant_id == tid)
-        .order_by(User.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
+    u_stmt = select(User).join(Membership, Membership.user_id == User.id).where(Membership.tenant_id == tid).order_by(User.created_at.desc()).offset(offset).limit(limit)
     if q:
         u_stmt = u_stmt.where(User.email.ilike(f"%{q}%"))
     users = (await session.execute(u_stmt)).scalars().all()
 
-    count_stmt = (
-        select(func.count(User.id.distinct()))
-        .select_from(User)
-        .join(Membership, Membership.user_id == User.id)
-        .where(Membership.tenant_id == tid)
-    )
+    count_stmt = select(func.count(User.id.distinct())).select_from(User).join(Membership, Membership.user_id == User.id).where(Membership.tenant_id == tid)
     if q:
         count_stmt = count_stmt.where(User.email.ilike(f"%{q}%"))
     total = (await session.execute(count_stmt)).scalar() or 0
@@ -139,12 +123,7 @@ async def list_users(
     # Roles per listed user (one query, then pivot). NULL tenant_id = platform grant.
     user_ids = [u.id for u in users]
     if user_ids:
-        role_stmt = (
-            select(UserRole.user_id, Role.role_key)
-            .join(Role, Role.id == UserRole.role_id)
-            .where(UserRole.user_id.in_(user_ids))
-            .where((UserRole.tenant_id == tid) | (UserRole.tenant_id.is_(None)))
-        )
+        role_stmt = select(UserRole.user_id, Role.role_key).join(Role, Role.id == UserRole.role_id).where(UserRole.user_id.in_(user_ids)).where((UserRole.tenant_id == tid) | (UserRole.tenant_id.is_(None)))
         role_pairs = (await session.execute(role_stmt)).all()
     else:
         role_pairs = []
@@ -167,21 +146,12 @@ async def get_user(
     uid: int,
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    u_stmt = (
-        select(User)
-        .join(Membership, Membership.user_id == User.id)
-        .where(Membership.tenant_id == tid, User.id == uid)
-    )
+    u_stmt = select(User).join(Membership, Membership.user_id == User.id).where(Membership.tenant_id == tid, User.id == uid)
     user = (await session.execute(u_stmt)).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="user not found")
 
-    role_stmt = (
-        select(Role.role_key)
-        .join(UserRole, UserRole.role_id == Role.id)
-        .where(UserRole.user_id == uid)
-        .where((UserRole.tenant_id == tid) | (UserRole.tenant_id.is_(None)))
-    )
+    role_stmt = select(Role.role_key).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == uid).where((UserRole.tenant_id == tid) | (UserRole.tenant_id.is_(None)))
     role_keys = [r[0] for r in (await session.execute(role_stmt)).all()]
     return _user_row(user, sorted(role_keys))
 
@@ -208,13 +178,7 @@ async def list_workspaces(
     limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    w_stmt = (
-        select(Workspace)
-        .where(Workspace.tenant_id == tid)
-        .order_by(Workspace.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
+    w_stmt = select(Workspace).where(Workspace.tenant_id == tid).order_by(Workspace.created_at.desc()).offset(offset).limit(limit)
     workspaces = (await session.execute(w_stmt)).scalars().all()
 
     count_stmt = select(func.count()).select_from(Workspace).where(Workspace.tenant_id == tid)
@@ -222,11 +186,7 @@ async def list_workspaces(
 
     ws_ids = [w.id for w in workspaces]
     if ws_ids:
-        mc_stmt = (
-            select(WorkspaceMember.workspace_id, func.count(WorkspaceMember.user_id))
-            .where(WorkspaceMember.workspace_id.in_(ws_ids))
-            .group_by(WorkspaceMember.workspace_id)
-        )
+        mc_stmt = select(WorkspaceMember.workspace_id, func.count(WorkspaceMember.user_id)).where(WorkspaceMember.workspace_id.in_(ws_ids)).group_by(WorkspaceMember.workspace_id)
         mc_pairs = (await session.execute(mc_stmt)).all()
     else:
         mc_pairs = []
@@ -260,11 +220,7 @@ async def list_workspace_members(
     )
     rows = (await session.execute(m_stmt)).all()
 
-    count_stmt = (
-        select(func.count())
-        .select_from(WorkspaceMember)
-        .where(WorkspaceMember.workspace_id == wid)
-    )
+    count_stmt = select(func.count()).select_from(WorkspaceMember).where(WorkspaceMember.workspace_id == wid)
     total = (await session.execute(count_stmt)).scalar() or 0
 
     return {
@@ -295,13 +251,7 @@ async def list_tenant_tokens(
     limit: int = Query(default=50, ge=1, le=200),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    stmt = (
-        select(ApiToken)
-        .where(ApiToken.tenant_id == tid)
-        .order_by(ApiToken.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-    )
+    stmt = select(ApiToken).where(ApiToken.tenant_id == tid).order_by(ApiToken.created_at.desc()).offset(offset).limit(limit)
     if not include_revoked:
         stmt = stmt.where(ApiToken.revoked_at.is_(None))
 

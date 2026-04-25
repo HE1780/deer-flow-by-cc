@@ -106,17 +106,7 @@ def test_flag_off_legacy_layout_returns_200(isolated_home, flag_off):
 def test_flag_on_same_tenant_returns_200(isolated_home, flag_on):
     paths = paths_mod.get_paths()
     paths.ensure_thread_dirs_for("t1", tenant_id=5, workspace_id=7)
-    outputs = (
-        isolated_home
-        / "tenants"
-        / "5"
-        / "workspaces"
-        / "7"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "outputs"
-    )
+    outputs = isolated_home / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "outputs"
     (outputs / "report.txt").write_text("scoped", encoding="utf-8")
 
     app = _make_app(identity=FakeIdentity(tenant_id=5, workspace_ids=(7,)))
@@ -144,25 +134,12 @@ def test_flag_on_cross_tenant_traversal_returns_403(isolated_home, flag_on):
     paths = paths_mod.get_paths()
     paths.ensure_thread_dirs_for("t1", tenant_id=5, workspace_id=7)
     paths.ensure_thread_dirs_for("t1", tenant_id=99, workspace_id=1)
-    other_outputs = (
-        isolated_home
-        / "tenants"
-        / "99"
-        / "workspaces"
-        / "1"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "outputs"
-    )
+    other_outputs = isolated_home / "tenants" / "99" / "workspaces" / "1" / "threads" / "t1" / "user-data" / "outputs"
     (other_outputs / "secret.txt").write_text("tenant-99-secret", encoding="utf-8")
 
     identity = FakeIdentity(tenant_id=5, workspace_ids=(7,))
     request = _fake_request_with_identity(identity)
-    traversal_path = (
-        "mnt/user-data/outputs/../../../../../../tenants/99/workspaces/1/"
-        "threads/t1/user-data/outputs/secret.txt"
-    )
+    traversal_path = "mnt/user-data/outputs/../../../../../../tenants/99/workspaces/1/threads/t1/user-data/outputs/secret.txt"
     with pytest.raises(Exception) as excinfo:
         asyncio.run(artifacts_router.get_artifact("t1", traversal_path, request))
     # Either the path resolver trips on the traversal (HTTPException 403),
@@ -183,9 +160,7 @@ def test_flag_on_path_traversal_returns_403(isolated_home, flag_on):
 
     app = _make_app(identity=FakeIdentity(tenant_id=5, workspace_ids=(7,)))
     with TestClient(app) as client:
-        r = client.get(
-            "/api/threads/t1/artifacts/mnt/user-data/outputs/../../../etc/passwd"
-        )
+        r = client.get("/api/threads/t1/artifacts/mnt/user-data/outputs/../../../etc/passwd")
     # Either 403 (traversal detected) or 400 (invalid path) — both are safe.
     # The path resolver raises "Access denied: path traversal detected", which
     # the gateway maps to 403.

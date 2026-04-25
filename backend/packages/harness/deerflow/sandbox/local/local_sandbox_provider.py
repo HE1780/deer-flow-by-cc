@@ -136,9 +136,7 @@ class LocalSandboxProvider(SandboxProvider):
                 # tenant/workspace ids. A malformed thread_id should surface
                 # loudly; in that case we have already failed earlier in the
                 # middleware chain, so treat this as a hard error.
-                raise ValueError(
-                    f"Failed to ensure tenant-aware thread dirs for {thread_id!r}: {exc}"
-                ) from exc
+                raise ValueError(f"Failed to ensure tenant-aware thread dirs for {thread_id!r}: {exc}") from exc
         return _singleton.id
 
     def get(self, sandbox_id: str) -> Sandbox | None:

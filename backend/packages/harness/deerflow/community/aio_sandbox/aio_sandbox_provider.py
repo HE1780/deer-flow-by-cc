@@ -263,9 +263,7 @@ class AioSandboxProvider(SandboxProvider):
         mounts: list[tuple[str, str, bool]] = []
 
         if thread_id:
-            mounts.extend(
-                self._get_thread_mounts(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-            )
+            mounts.extend(self._get_thread_mounts(thread_id, tenant_id=tenant_id, workspace_id=workspace_id))
             logger.info(f"Adding thread mounts for thread {thread_id}: {mounts}")
 
         skills_mount = self._get_skills_mount()
@@ -537,9 +535,7 @@ class AioSandboxProvider(SandboxProvider):
         # for the same thread_id serialize here: the second process will discover
         # the container started by the first instead of hitting a name-conflict.
         if thread_id:
-            return self._discover_or_create_with_lock(
-                thread_id, sandbox_id, tenant_id=tenant_id, workspace_id=workspace_id
-            )
+            return self._discover_or_create_with_lock(thread_id, sandbox_id, tenant_id=tenant_id, workspace_id=workspace_id)
 
         return self._create_sandbox(thread_id, sandbox_id, tenant_id=tenant_id, workspace_id=workspace_id)
 
@@ -563,10 +559,7 @@ class AioSandboxProvider(SandboxProvider):
         """
         paths = get_paths()
         paths.ensure_thread_dirs_for(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-        lock_path = (
-            paths.resolve_thread_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
-            / f"{sandbox_id}.lock"
-        )
+        lock_path = paths.resolve_thread_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id) / f"{sandbox_id}.lock"
 
         with open(lock_path, "a", encoding="utf-8") as lock_file:
             locked = False
@@ -604,9 +597,7 @@ class AioSandboxProvider(SandboxProvider):
                     logger.info(f"Discovered existing sandbox {discovered.sandbox_id} for thread {thread_id} at {discovered.sandbox_url}")
                     return discovered.sandbox_id
 
-                return self._create_sandbox(
-                    thread_id, sandbox_id, tenant_id=tenant_id, workspace_id=workspace_id
-                )
+                return self._create_sandbox(thread_id, sandbox_id, tenant_id=tenant_id, workspace_id=workspace_id)
             finally:
                 if locked:
                     _unlock_file(lock_file)
@@ -653,9 +644,7 @@ class AioSandboxProvider(SandboxProvider):
         Raises:
             RuntimeError: If sandbox creation or readiness check fails.
         """
-        extra_mounts = self._get_extra_mounts(
-            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
-        )
+        extra_mounts = self._get_extra_mounts(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
 
         # Enforce replicas: only warm-pool containers count toward eviction budget.
         # Active sandboxes are in use by live threads and must not be forcibly stopped.

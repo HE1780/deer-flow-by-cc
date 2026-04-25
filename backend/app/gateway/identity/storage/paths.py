@@ -177,9 +177,7 @@ def thread_path(tenant_id: int, workspace_id: int, thread_id: str) -> Path:
         raise ValueError(f"thread_id must be a non-empty str, got {thread_id!r}")
     for bad in ("/", "\\", "..", "\0"):
         if bad in thread_id:
-            raise ValueError(
-                f"thread_id must not contain {bad!r}, got {thread_id!r}"
-            )
+            raise ValueError(f"thread_id must not contain {bad!r}, got {thread_id!r}")
     return workspace_root(tenant_id, workspace_id) / "threads" / thread_id
 
 
@@ -261,13 +259,7 @@ def audit_archive_path(tenant_id: int, yyyy_mm: str) -> Path:
     """
 
     _require_positive("tenant_id", tenant_id)
-    if (
-        not isinstance(yyyy_mm, str)
-        or len(yyyy_mm) != 7
-        or yyyy_mm[4] != "-"
-        or not yyyy_mm[:4].isdigit()
-        or not yyyy_mm[5:].isdigit()
-    ):
+    if not isinstance(yyyy_mm, str) or len(yyyy_mm) != 7 or yyyy_mm[4] != "-" or not yyyy_mm[:4].isdigit() or not yyyy_mm[5:].isdigit():
         raise ValueError(f"yyyy_mm must be 'YYYY-MM', got {yyyy_mm!r}")
     return deerflow_home() / "_system" / "audit_archive" / str(tenant_id) / f"{yyyy_mm}.jsonl.gz"
 

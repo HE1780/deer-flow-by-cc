@@ -164,15 +164,9 @@ def test_aio_thread_mounts_legacy_when_identity_absent(tmp_path, monkeypatch):
     by_container = {container: (host, ro) for host, container, ro in mounts}
 
     # Legacy layout: .../threads/thread-legacy/user-data/...
-    assert by_container["/mnt/user-data/workspace"][0] == str(
-        tmp_path / "threads" / "thread-legacy" / "user-data" / "workspace"
-    )
-    assert by_container["/mnt/user-data/uploads"][0] == str(
-        tmp_path / "threads" / "thread-legacy" / "user-data" / "uploads"
-    )
-    assert by_container["/mnt/user-data/outputs"][0] == str(
-        tmp_path / "threads" / "thread-legacy" / "user-data" / "outputs"
-    )
+    assert by_container["/mnt/user-data/workspace"][0] == str(tmp_path / "threads" / "thread-legacy" / "user-data" / "workspace")
+    assert by_container["/mnt/user-data/uploads"][0] == str(tmp_path / "threads" / "thread-legacy" / "user-data" / "uploads")
+    assert by_container["/mnt/user-data/outputs"][0] == str(tmp_path / "threads" / "thread-legacy" / "user-data" / "outputs")
     # Destinations never include tenant ids
     assert all("tenants" not in cp for cp in by_container)
 
@@ -181,9 +175,7 @@ def test_aio_thread_mounts_tenant_aware_sources(tmp_path, monkeypatch):
     aio_mod = _aio_mod()
     monkeypatch.setattr(aio_mod, "get_paths", lambda: Paths(base_dir=tmp_path))
 
-    mounts = aio_mod.AioSandboxProvider._get_thread_mounts(
-        "thread-scoped", tenant_id=5, workspace_id=7
-    )
+    mounts = aio_mod.AioSandboxProvider._get_thread_mounts("thread-scoped", tenant_id=5, workspace_id=7)
     by_container = {container: (host, ro) for host, container, ro in mounts}
 
     base = tmp_path / "tenants" / "5" / "workspaces" / "7" / "threads" / "thread-scoped"
@@ -211,9 +203,7 @@ def test_aio_thread_mounts_ensure_dirs_created(tmp_path, monkeypatch):
     aio_mod = _aio_mod()
     monkeypatch.setattr(aio_mod, "get_paths", lambda: Paths(base_dir=tmp_path))
 
-    aio_mod.AioSandboxProvider._get_thread_mounts(
-        "thread-ensure", tenant_id=3, workspace_id=4
-    )
+    aio_mod.AioSandboxProvider._get_thread_mounts("thread-ensure", tenant_id=3, workspace_id=4)
 
     base = tmp_path / "tenants" / "3" / "workspaces" / "4" / "threads" / "thread-ensure"
     assert (base / "user-data" / "workspace").is_dir()
@@ -226,13 +216,9 @@ def test_aio_thread_mounts_partial_identity_falls_back(tmp_path, monkeypatch):
     aio_mod = _aio_mod()
     monkeypatch.setattr(aio_mod, "get_paths", lambda: Paths(base_dir=tmp_path))
 
-    mounts = aio_mod.AioSandboxProvider._get_thread_mounts(
-        "thread-partial", tenant_id=5, workspace_id=None
-    )
+    mounts = aio_mod.AioSandboxProvider._get_thread_mounts("thread-partial", tenant_id=5, workspace_id=None)
     by_container = {container: host for host, container, _ in mounts}
-    assert by_container["/mnt/user-data/workspace"] == str(
-        tmp_path / "threads" / "thread-partial" / "user-data" / "workspace"
-    )
+    assert by_container["/mnt/user-data/workspace"] == str(tmp_path / "threads" / "thread-partial" / "user-data" / "workspace")
 
 
 # ---------------------------------------------------------------------------
@@ -245,30 +231,15 @@ def test_resolve_virtual_path_legacy_fallback(tmp_path):
     paths.ensure_thread_dirs("t1")
 
     actual = paths.resolve_virtual_path("t1", "/mnt/user-data/outputs/report.pdf")
-    assert actual == (
-        tmp_path / "threads" / "t1" / "user-data" / "outputs" / "report.pdf"
-    ).resolve()
+    assert actual == (tmp_path / "threads" / "t1" / "user-data" / "outputs" / "report.pdf").resolve()
 
 
 def test_resolve_virtual_path_tenant_aware(tmp_path):
     paths = Paths(base_dir=tmp_path)
     paths.ensure_thread_dirs_for("t1", tenant_id=5, workspace_id=7)
 
-    actual = paths.resolve_virtual_path(
-        "t1", "/mnt/user-data/outputs/report.pdf", tenant_id=5, workspace_id=7
-    )
-    expected = (
-        tmp_path
-        / "tenants"
-        / "5"
-        / "workspaces"
-        / "7"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "outputs"
-        / "report.pdf"
-    ).resolve()
+    actual = paths.resolve_virtual_path("t1", "/mnt/user-data/outputs/report.pdf", tenant_id=5, workspace_id=7)
+    expected = (tmp_path / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "outputs" / "report.pdf").resolve()
     assert actual == expected
 
 
@@ -319,9 +290,7 @@ def test_local_sandbox_write_lands_in_tenant_path_via_tools(isolated_paths):
     }
 
     # Happy path: resolves to the tenant-scoped host path.
-    resolved = _resolve_and_validate_user_data_path(
-        "/mnt/user-data/workspace/hello.txt", thread_data
-    )
+    resolved = _resolve_and_validate_user_data_path("/mnt/user-data/workspace/hello.txt", thread_data)
     assert Path(resolved).parent == (base / "workspace").resolve()
 
 
@@ -360,18 +329,7 @@ def test_local_sandbox_cross_tenant_escape_rejected(isolated_paths):
 
     # Even if the traversal check were bypassed, the post-resolve validator
     # rejects because the resolved host path is outside allowed roots.
-    evil = (
-        isolated_paths
-        / "tenants"
-        / "99"
-        / "workspaces"
-        / "1"
-        / "threads"
-        / "t1"
-        / "user-data"
-        / "outputs"
-        / "loot.txt"
-    )
+    evil = isolated_paths / "tenants" / "99" / "workspaces" / "1" / "threads" / "t1" / "user-data" / "outputs" / "loot.txt"
     from deerflow.sandbox.tools import _validate_resolved_user_data_path
 
     with pytest.raises(PermissionError, match="traversal"):
@@ -413,9 +371,7 @@ def test_sandbox_middleware_forwards_identity_to_provider(isolated_paths):
     state = {"identity": SimpleNamespace(tenant_id=5, workspace_id=7)}
     runtime = SimpleNamespace(context={"thread_id": "t1"})
 
-    with patch(
-        "deerflow.sandbox.middleware.get_sandbox_provider", return_value=_FakeProvider()
-    ):
+    with patch("deerflow.sandbox.middleware.get_sandbox_provider", return_value=_FakeProvider()):
         result = middleware.before_agent(state, runtime)
 
     assert result == {"sandbox": {"sandbox_id": "sbx-1"}}
@@ -440,9 +396,7 @@ def test_sandbox_middleware_no_identity_passes_none(isolated_paths):
     state: dict[str, object] = {}  # no identity
     runtime = SimpleNamespace(context={"thread_id": "t1"})
 
-    with patch(
-        "deerflow.sandbox.middleware.get_sandbox_provider", return_value=_FakeProvider()
-    ):
+    with patch("deerflow.sandbox.middleware.get_sandbox_provider", return_value=_FakeProvider()):
         middleware.before_agent(state, runtime)
 
     assert captured == {"tenant_id": None, "workspace_id": None}
@@ -464,11 +418,13 @@ def _make_aio_provider_no_backend(tmp_path, monkeypatch):
     # Redirect paths to tmp_path so directory creation is isolated.
     monkeypatch.setattr(aio_mod, "get_paths", lambda: Paths(base_dir=tmp_path))
 
-    with patch.object(aio_mod.AioSandboxProvider, "_start_idle_checker"), patch.object(
-        aio_mod.AioSandboxProvider, "_reconcile_orphans"
-    ), patch.object(aio_mod.AioSandboxProvider, "_register_signal_handlers"), patch.object(
-        aio_mod.AioSandboxProvider, "_load_config", return_value={"replicas": 3, "idle_timeout": 0}
-    ), patch.object(aio_mod.AioSandboxProvider, "_create_backend") as mock_backend_factory:
+    with (
+        patch.object(aio_mod.AioSandboxProvider, "_start_idle_checker"),
+        patch.object(aio_mod.AioSandboxProvider, "_reconcile_orphans"),
+        patch.object(aio_mod.AioSandboxProvider, "_register_signal_handlers"),
+        patch.object(aio_mod.AioSandboxProvider, "_load_config", return_value={"replicas": 3, "idle_timeout": 0}),
+        patch.object(aio_mod.AioSandboxProvider, "_create_backend") as mock_backend_factory,
+    ):
         backend = MagicMock()
         backend.list_running.return_value = []
         backend.discover.return_value = None
@@ -487,9 +443,7 @@ def _make_aio_provider_no_backend(tmp_path, monkeypatch):
 
     # Stub out readiness polling so ``_create_sandbox`` returns immediately.
     monkeypatch.setattr(aio_mod, "wait_for_sandbox_ready", lambda url, timeout=60: True)
-    monkeypatch.setattr(
-        aio_mod, "AioSandbox", lambda id, base_url: SimpleNamespace(id=id, base_url=base_url)
-    )
+    monkeypatch.setattr(aio_mod, "AioSandbox", lambda id, base_url: SimpleNamespace(id=id, base_url=base_url))
 
     return provider, backend
 
@@ -521,9 +475,7 @@ def test_aio_acquire_without_identity_uses_legacy(tmp_path, monkeypatch):
     provider.acquire("t1")
     _, _, extra_mounts = backend.last_create_call
     by_container = {container: host for host, container, _ in extra_mounts}
-    assert by_container["/mnt/user-data/workspace"] == str(
-        tmp_path / "threads" / "t1" / "user-data" / "workspace"
-    )
+    assert by_container["/mnt/user-data/workspace"] == str(tmp_path / "threads" / "t1" / "user-data" / "workspace")
     assert not (tmp_path / "tenants").exists()
 
 
@@ -540,9 +492,7 @@ def test_bind_mount_destinations_contain_no_tenant_id(tmp_path, monkeypatch):
     aio_mod = _aio_mod()
     monkeypatch.setattr(aio_mod, "get_paths", lambda: Paths(base_dir=tmp_path))
 
-    mounts = aio_mod.AioSandboxProvider._get_thread_mounts(
-        "t-invariant", tenant_id=12345, workspace_id=67890
-    )
+    mounts = aio_mod.AioSandboxProvider._get_thread_mounts("t-invariant", tenant_id=12345, workspace_id=67890)
     for _, container_path, _ in mounts:
         assert container_path.startswith("/mnt/")
         # The only digits that may appear are inside the names of static
@@ -567,15 +517,9 @@ def test_local_sandbox_singleton_kept_across_identity(isolated_paths):
     sid3 = provider.acquire("t3", tenant_id=99, workspace_id=1)
     assert sid1 == sid2 == sid3 == "local"
     # Both tenant paths exist independently; the legacy path exists for t2.
-    assert (
-        isolated_paths / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "workspace"
-    ).exists()
-    assert (
-        isolated_paths / "threads" / "t2" / "user-data" / "workspace"
-    ).exists()
-    assert (
-        isolated_paths / "tenants" / "99" / "workspaces" / "1" / "threads" / "t3" / "user-data" / "workspace"
-    ).exists()
+    assert (isolated_paths / "tenants" / "5" / "workspaces" / "7" / "threads" / "t1" / "user-data" / "workspace").exists()
+    assert (isolated_paths / "threads" / "t2" / "user-data" / "workspace").exists()
+    assert (isolated_paths / "tenants" / "99" / "workspaces" / "1" / "threads" / "t3" / "user-data" / "workspace").exists()
 
 
 def test_local_sandbox_instance_reused(isolated_paths):

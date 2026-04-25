@@ -134,9 +134,7 @@ def test_skills_tenant_custom_root_is_tenant_scoped(tmp_path, monkeypatch):
 
 def test_skills_workspace_user_root_is_workspace_scoped(tmp_path, monkeypatch):
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    assert skills_workspace_user_root(7, 42) == (
-        tmp_path.resolve() / "tenants" / "7" / "workspaces" / "42" / "user"
-    )
+    assert skills_workspace_user_root(7, 42) == (tmp_path.resolve() / "tenants" / "7" / "workspaces" / "42" / "user")
 
 
 def test_skills_roots_are_distinct(tmp_path, monkeypatch):
@@ -156,14 +154,7 @@ def test_skills_roots_are_distinct(tmp_path, monkeypatch):
 def test_user_memory_path_layout(tmp_path, monkeypatch):
     """Spec §7.4: user memory lives under tenants/{tid}/users/{uid}/memory.json."""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    expected = (
-        tmp_path.resolve()
-        / "tenants"
-        / "7"
-        / "users"
-        / "99"
-        / "memory.json"
-    )
+    expected = tmp_path.resolve() / "tenants" / "7" / "users" / "99" / "memory.json"
     assert user_memory_path(7, 99) == expected
 
 
@@ -175,9 +166,7 @@ def test_user_memory_path_layout(tmp_path, monkeypatch):
 def test_audit_fallback_path_layout(tmp_path, monkeypatch):
     """Spec §9.3: fallback lives under _system/audit_fallback/{date}.jsonl."""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    assert audit_fallback_path("20260422") == (
-        tmp_path.resolve() / "_system" / "audit_fallback" / "20260422.jsonl"
-    )
+    assert audit_fallback_path("20260422") == (tmp_path.resolve() / "_system" / "audit_fallback" / "20260422.jsonl")
 
 
 def test_audit_fallback_path_rejects_malformed_date():
@@ -189,9 +178,7 @@ def test_audit_fallback_path_rejects_malformed_date():
 def test_audit_archive_path_layout(tmp_path, monkeypatch):
     """Spec §9.6: archive is a FILE at _system/audit_archive/{tid}/{yyyy-mm}.jsonl.gz."""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    assert audit_archive_path(7, "2026-04") == (
-        tmp_path.resolve() / "_system" / "audit_archive" / "7" / "2026-04.jsonl.gz"
-    )
+    assert audit_archive_path(7, "2026-04") == (tmp_path.resolve() / "_system" / "audit_archive" / "7" / "2026-04.jsonl.gz")
 
 
 def test_audit_archive_path_is_file_not_directory(tmp_path, monkeypatch):
@@ -216,9 +203,7 @@ def test_audit_archive_path_rejects_malformed_month():
 def test_migration_report_path_layout(tmp_path, monkeypatch):
     """Spec §10.2: reports live at _system/migration_report_{ts}.json."""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    assert migration_report_path("2026-04-22T12-00-00Z") == (
-        tmp_path.resolve() / "_system" / "migration_report_2026-04-22T12-00-00Z.json"
-    )
+    assert migration_report_path("2026-04-22T12-00-00Z") == (tmp_path.resolve() / "_system" / "migration_report_2026-04-22T12-00-00Z.json")
 
 
 def test_migration_report_path_rejects_empty():

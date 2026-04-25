@@ -2581,9 +2581,7 @@ class TestChannelManagerIdentity:
             bus.subscribe_outbound(capture)
             await manager.start()
 
-            await bus.publish_inbound(
-                InboundMessage(channel_name="telegram", chat_id="chat1", user_id="u1", text="hi")
-            )
+            await bus.publish_inbound(InboundMessage(channel_name="telegram", chat_id="chat1", user_id="u1", text="hi"))
             await _wait_for(lambda: len(outbound_received) >= 1)
             await manager.stop()
 

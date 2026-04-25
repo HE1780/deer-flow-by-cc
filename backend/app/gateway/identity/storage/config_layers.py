@@ -140,14 +140,7 @@ def load_layered_config(
             tenant_cfg = _load_yaml_or_empty(tenant_file)
 
         if workspace_id is not None:
-            workspace_file = (
-                deerflow_home
-                / "tenants"
-                / str(tenant_id)
-                / "workspaces"
-                / str(workspace_id)
-                / "config.yaml"
-            )
+            workspace_file = deerflow_home / "tenants" / str(tenant_id) / "workspaces" / str(workspace_id) / "config.yaml"
             if workspace_file.exists():
                 workspace_cfg = _load_yaml_or_empty(workspace_file)
 
@@ -205,9 +198,7 @@ def _load_yaml_or_empty(path: Path) -> dict[str, Any]:
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise ValueError(
-            f"config file {path} must parse to a mapping at the top level, got {type(data).__name__}"
-        )
+        raise ValueError(f"config file {path} must parse to a mapping at the top level, got {type(data).__name__}")
     return data
 
 
@@ -251,10 +242,7 @@ def _check_sensitive_layer(cfg: dict[str, Any] | None, *, layer: str) -> None:
         return
     for path in SENSITIVE_GLOBAL_ONLY:
         if _any_layer_sets_sensitive_path(cfg, path):
-            raise SensitiveFieldViolation(
-                f"{layer} config layer attempts to set platform-only field "
-                f"{path!r}; this field may only be set in the global config."
-            )
+            raise SensitiveFieldViolation(f"{layer} config layer attempts to set platform-only field {path!r}; this field may only be set in the global config.")
 
 
 def _any_layer_sets_sensitive_path(cfg: dict[str, Any], path: str) -> bool:

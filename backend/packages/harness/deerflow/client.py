@@ -1196,9 +1196,7 @@ class DeerFlowClient:
             ValueError: If the path is invalid.
         """
         try:
-            actual = get_paths().resolve_virtual_path(
-                thread_id, path, tenant_id=tenant_id, workspace_id=workspace_id
-            )
+            actual = get_paths().resolve_virtual_path(thread_id, path, tenant_id=tenant_id, workspace_id=workspace_id)
         except ValueError as exc:
             if "traversal" in str(exc):
                 from deerflow.uploads.manager import PathTraversalError

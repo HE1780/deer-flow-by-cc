@@ -8,7 +8,7 @@ a stub. No live DB.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -147,7 +147,7 @@ def test_create_user_allowed_for_tenant_owner(writes_app):
 
             if isinstance(obj, User):
                 obj.id = created_user.id
-                obj.created_at = datetime(2026, 4, 24, tzinfo=timezone.utc)
+                obj.created_at = datetime(2026, 4, 24, tzinfo=UTC)
                 obj.last_login_at = None
                 obj.status = 1
                 obj.avatar_url = None
@@ -182,9 +182,13 @@ def test_create_user_409_when_membership_exists(writes_app):
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
 
     existing_user = SimpleNamespace(
-        id=10, email="dup@example.com", display_name="Dup",
-        avatar_url=None, status=1, last_login_at=None,
-        created_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        id=10,
+        email="dup@example.com",
+        display_name="Dup",
+        avatar_url=None,
+        status=1,
+        last_login_at=None,
+        created_at=datetime(2026, 4, 1, tzinfo=UTC),
     )
     existing_membership = SimpleNamespace(id=99, user_id=10, tenant_id=5)
 
@@ -233,8 +237,11 @@ def test_add_workspace_member_allowed_for_tenant_owner(writes_app):
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
 
     target_user = SimpleNamespace(
-        id=11, email="b@b.com", display_name="Bob",
-        avatar_url=None, status=1,
+        id=11,
+        email="b@b.com",
+        display_name="Bob",
+        avatar_url=None,
+        status=1,
     )
     role = SimpleNamespace(id=8, role_key="member", scope="workspace")
 
@@ -303,8 +310,11 @@ def test_add_workspace_member_400_when_user_not_in_tenant(writes_app):
                 result.scalar_one_or_none.return_value = SimpleNamespace(id=7, tenant_id=5)
             elif self.calls == 2:
                 result.scalar_one_or_none.return_value = SimpleNamespace(
-                    id=11, email="b@b.com", display_name="Bob",
-                    avatar_url=None, status=1,
+                    id=11,
+                    email="b@b.com",
+                    display_name="Bob",
+                    avatar_url=None,
+                    status=1,
                 )
             elif self.calls == 3:
                 # No tenant membership
@@ -328,8 +338,11 @@ def test_patch_workspace_member_role(writes_app):
     member = SimpleNamespace(user_id=11, workspace_id=7, role_id=8)
     new_role = SimpleNamespace(id=9, role_key="workspace_admin", scope="workspace")
     target_user = SimpleNamespace(
-        id=11, email="b@b.com", display_name="Bob",
-        avatar_url=None, status=1,
+        id=11,
+        email="b@b.com",
+        display_name="Bob",
+        avatar_url=None,
+        status=1,
     )
 
     class _Sess(_StubSession):
@@ -574,9 +587,7 @@ def test_create_tenant_allowed_for_platform_admin(writes_app):
 
     holder["session"] = _Sess()
     with TestClient(app) as c:
-        r = c.post(
-            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
-        )
+        r = c.post("/api/admin/tenants", json={"slug": "acme", "name": "Acme"})
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["slug"] == "acme"
@@ -587,9 +598,7 @@ def test_create_tenant_forbidden_for_tenant_owner(writes_app):
     app, holder = writes_app
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
     with TestClient(app) as c:
-        r = c.post(
-            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
-        )
+        r = c.post("/api/admin/tenants", json={"slug": "acme", "name": "Acme"})
     assert r.status_code == 403
 
 
@@ -607,9 +616,7 @@ def test_create_tenant_409_on_slug_conflict(writes_app):
 
     holder["session"] = _Sess()
     with TestClient(app) as c:
-        r = c.post(
-            "/api/admin/tenants", json={"slug": "acme", "name": "Acme"}
-        )
+        r = c.post("/api/admin/tenants", json={"slug": "acme", "name": "Acme"})
     assert r.status_code == 409
     assert "slug" in r.json()["detail"].lower()
 
@@ -618,9 +625,7 @@ def test_create_tenant_422_on_invalid_slug(writes_app):
     app, holder = writes_app
     holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
     with TestClient(app) as c:
-        r = c.post(
-            "/api/admin/tenants", json={"slug": "NO-CAPS", "name": "x"}
-        )
+        r = c.post("/api/admin/tenants", json={"slug": "NO-CAPS", "name": "x"})
     assert r.status_code == 422
 
 
@@ -783,9 +788,7 @@ def test_patch_workspace_renames(writes_app):
 
     holder["session"] = _Sess()
     with TestClient(app) as c:
-        r = c.patch(
-            "/api/tenants/5/workspaces/7", json={"name": "New"}
-        )
+        r = c.patch("/api/tenants/5/workspaces/7", json={"name": "New"})
     assert r.status_code == 200, r.text
     assert ws.name == "New"
 
@@ -805,9 +808,7 @@ def test_patch_workspace_cross_tenant_404(writes_app):
 
     holder["session"] = _Sess()
     with TestClient(app) as c:
-        r = c.patch(
-            "/api/tenants/5/workspaces/7", json={"name": "New"}
-        )
+        r = c.patch("/api/tenants/5/workspaces/7", json={"name": "New"})
     assert r.status_code == 404
 
 
@@ -905,13 +906,9 @@ def test_write_endpoints_emit_audit(method, path, body, role, setup):
             if setup == "create_tenant" or setup == "create_workspace":
                 result.scalar_one_or_none.return_value = None  # no conflict
             elif setup == "get_tenant":
-                result.scalar_one_or_none.return_value = SimpleNamespace(
-                    id=5, slug="acme", name="Old", plan="free", status=1
-                )
+                result.scalar_one_or_none.return_value = SimpleNamespace(id=5, slug="acme", name="Old", plan="free", status=1)
             elif setup == "get_workspace":
-                result.scalar_one_or_none.return_value = SimpleNamespace(
-                    id=7, tenant_id=5, slug="eng", name="Old"
-                )
+                result.scalar_one_or_none.return_value = SimpleNamespace(id=7, tenant_id=5, slug="eng", name="Old")
             return result
 
         def add(self, obj):

@@ -303,15 +303,7 @@ class Paths:
         """
         _require_positive_tenant_or_workspace("tenant_id", tenant_id)
         _require_positive_tenant_or_workspace("workspace_id", workspace_id)
-        return (
-            self.base_dir
-            / "tenants"
-            / str(tenant_id)
-            / "workspaces"
-            / str(workspace_id)
-            / "threads"
-            / _validate_thread_id(thread_id)
-        )
+        return self.base_dir / "tenants" / str(tenant_id) / "workspaces" / str(workspace_id) / "threads" / _validate_thread_id(thread_id)
 
     def resolve_thread_dir(
         self,
@@ -539,9 +531,7 @@ class Paths:
             raise ValueError(f"Path must start with /{prefix}")
 
         relative = stripped[len(prefix) :].lstrip("/")
-        base = self.resolve_sandbox_user_data_dir(
-            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
-        ).resolve()
+        base = self.resolve_sandbox_user_data_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id).resolve()
         actual = (base / relative).resolve()
 
         try:

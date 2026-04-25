@@ -165,10 +165,7 @@ def _positive_int(raw: str) -> int:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m app.gateway.identity.storage.cli",
-        description=(
-            "Ensure the per-tenant (and optionally per-workspace) storage "
-            "directory tree exists with 0700 permissions. Idempotent."
-        ),
+        description=("Ensure the per-tenant (and optionally per-workspace) storage directory tree exists with 0700 permissions. Idempotent."),
     )
     parser.add_argument(
         "--tenant-id",
@@ -186,10 +183,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--home",
         type=Path,
         default=None,
-        help=(
-            "Override DeerFlow home root. Defaults to $DEER_FLOW_HOME or "
-            "backend/.deer-flow."
-        ),
+        help=("Override DeerFlow home root. Defaults to $DEER_FLOW_HOME or backend/.deer-flow."),
     )
     return parser
 

@@ -82,9 +82,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             identity = state.get("identity") if hasattr(state, "get") else None
             tenant_id, workspace_id = extract_tenant_ids(identity)
 
-            sandbox_id = self._acquire_sandbox(
-                thread_id, tenant_id=tenant_id, workspace_id=workspace_id
-            )
+            sandbox_id = self._acquire_sandbox(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
             logger.info(f"Assigned sandbox {sandbox_id} to thread {thread_id}")
             return {"sandbox": {"sandbox_id": sandbox_id}}
         return super().before_agent(state, runtime)

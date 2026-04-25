@@ -340,14 +340,7 @@ def test_harness_boundary_still_clean() -> None:
     """Loader must not import from app.* — duplicate the import firewall check here."""
     import ast
 
-    loader_path = (
-        Path(__file__).resolve().parents[3]
-        / "packages"
-        / "harness"
-        / "deerflow"
-        / "skills"
-        / "loader.py"
-    )
+    loader_path = Path(__file__).resolve().parents[3] / "packages" / "harness" / "deerflow" / "skills" / "loader.py"
     tree = ast.parse(loader_path.read_text(encoding="utf-8"), filename=str(loader_path))
 
     offenders: list[str] = []

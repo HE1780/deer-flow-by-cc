@@ -7,7 +7,7 @@ with a stub returning canned rows — no live DB/Redis needed.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -101,7 +101,7 @@ def test_list_tenants_allowed_for_platform_admin(admin_app):
                 name="Acme",
                 plan="pro",
                 status=1,
-                created_at=datetime(2026, 4, 1, 12, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 4, 1, 12, 0, tzinfo=UTC),
             ),
             SimpleNamespace(
                 id=2,
@@ -109,7 +109,7 @@ def test_list_tenants_allowed_for_platform_admin(admin_app):
                 name="Hooli",
                 plan="free",
                 status=1,
-                created_at=datetime(2026, 4, 2, 12, 0, tzinfo=timezone.utc),
+                created_at=datetime(2026, 4, 2, 12, 0, tzinfo=UTC),
             ),
         ],
         scalar_result=2,
@@ -146,8 +146,12 @@ def test_get_tenant_detail_platform_admin(admin_app):
     app, holder = admin_app
     holder["identity"] = _identity_for_role("platform_admin", tenant_id=1)
     t = SimpleNamespace(
-        id=7, slug="acme", name="Acme", plan="pro", status=1,
-        created_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        id=7,
+        slug="acme",
+        name="Acme",
+        plan="pro",
+        status=1,
+        created_at=datetime(2026, 4, 1, tzinfo=UTC),
     )
 
     class _Multi(_StubSession):
@@ -197,8 +201,12 @@ def test_list_users_allowed_for_tenant_owner(admin_app):
     app, holder = admin_app
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
     user_row = SimpleNamespace(
-        id=10, email="a@b.com", display_name="Alice", status=1, avatar_url=None,
-        last_login_at=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        id=10,
+        email="a@b.com",
+        display_name="Alice",
+        status=1,
+        avatar_url=None,
+        last_login_at=datetime(2026, 4, 15, tzinfo=UTC),
     )
 
     class _Users(_StubSession):
@@ -239,8 +247,12 @@ def test_get_user_detail_platform_admin(admin_app):
     app, holder = admin_app
     holder["identity"] = _identity_for_role("platform_admin", tenant_id=5)
     u = SimpleNamespace(
-        id=10, email="a@b.com", display_name="Alice", status=1, avatar_url=None,
-        last_login_at=datetime(2026, 4, 15, tzinfo=timezone.utc),
+        id=10,
+        email="a@b.com",
+        display_name="Alice",
+        status=1,
+        avatar_url=None,
+        last_login_at=datetime(2026, 4, 15, tzinfo=UTC),
     )
 
     class _One(_StubSession):
@@ -270,8 +282,12 @@ def test_list_workspaces_tenant_owner(admin_app):
     app, holder = admin_app
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
     ws = SimpleNamespace(
-        id=7, tenant_id=5, slug="main", name="Main", description=None,
-        created_at=datetime(2026, 4, 10, tzinfo=timezone.utc),
+        id=7,
+        tenant_id=5,
+        slug="main",
+        name="Main",
+        description=None,
+        created_at=datetime(2026, 4, 10, tzinfo=UTC),
     )
 
     class _WS(_StubSession):
@@ -305,7 +321,7 @@ def test_list_workspace_members(admin_app):
     row = (
         SimpleNamespace(id=11, email="b@b.com", display_name="Bob", status=1, avatar_url=None),
         "workspace_admin",
-        datetime(2026, 4, 11, tzinfo=timezone.utc),
+        datetime(2026, 4, 11, tzinfo=UTC),
     )
 
     class _MM(_StubSession):
@@ -336,12 +352,17 @@ def test_list_tenant_tokens(admin_app):
     app, holder = admin_app
     holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
     tok = SimpleNamespace(
-        id=100, tenant_id=5, user_id=10, workspace_id=7,
-        name="ci-bot", prefix="dft_abc123", scopes=["skill:invoke"],
+        id=100,
+        tenant_id=5,
+        user_id=10,
+        workspace_id=7,
+        name="ci-bot",
+        prefix="dft_abc123",
+        scopes=["skill:invoke"],
         expires_at=None,
-        last_used_at=datetime(2026, 4, 20, tzinfo=timezone.utc),
+        last_used_at=datetime(2026, 4, 20, tzinfo=UTC),
         revoked_at=None,
-        created_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 4, 1, tzinfo=UTC),
     )
 
     class _Tok(_StubSession):

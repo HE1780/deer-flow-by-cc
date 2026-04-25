@@ -74,17 +74,17 @@ def app_with_admin():
 
 DENIALS = [
     # role,          method, path,                                        expected
-    ("member",       "GET",  "/api/admin/tenants",                        403),
-    ("tenant_owner", "GET",  "/api/admin/tenants",                        403),
-    ("viewer",       "GET",  "/api/tenants/1/users",                      403),
-    ("member",       "GET",  "/api/tenants/1/users",                      403),
-    ("tenant_owner", "GET",  "/api/tenants/99/users",                     403),  # cross-tenant
-    ("member",       "GET",  "/api/tenants/1/workspaces",                 403),
-    ("tenant_owner", "GET",  "/api/tenants/99/workspaces",                403),  # cross-tenant
-    ("member",       "GET",  "/api/tenants/1/workspaces/1/members",       403),
-    ("tenant_owner", "GET",  "/api/tenants/99/workspaces/1/members",      403),
-    ("member",       "GET",  "/api/tenants/1/tokens",                     403),
-    ("tenant_owner", "GET",  "/api/tenants/99/tokens",                    403),
+    ("member", "GET", "/api/admin/tenants", 403),
+    ("tenant_owner", "GET", "/api/admin/tenants", 403),
+    ("viewer", "GET", "/api/tenants/1/users", 403),
+    ("member", "GET", "/api/tenants/1/users", 403),
+    ("tenant_owner", "GET", "/api/tenants/99/users", 403),  # cross-tenant
+    ("member", "GET", "/api/tenants/1/workspaces", 403),
+    ("tenant_owner", "GET", "/api/tenants/99/workspaces", 403),  # cross-tenant
+    ("member", "GET", "/api/tenants/1/workspaces/1/members", 403),
+    ("tenant_owner", "GET", "/api/tenants/99/workspaces/1/members", 403),
+    ("member", "GET", "/api/tenants/1/tokens", 403),
+    ("tenant_owner", "GET", "/api/tenants/99/tokens", 403),
 ]
 
 

@@ -48,38 +48,17 @@ async def _mint() -> str:
     engine, maker = create_engine_and_sessionmaker(settings.database_url)
     try:
         async with maker() as session:
-            user = (
-                await session.execute(select(User).where(User.email == email))
-            ).scalar_one_or_none()
+            user = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
             if user is None:
-                raise SystemExit(
-                    f"bootstrap admin {email!r} not found (run `make identity-bootstrap` first)"
-                )
+                raise SystemExit(f"bootstrap admin {email!r} not found (run `make identity-bootstrap` first)")
 
-            tenant = (
-                await session.execute(
-                    select(Tenant)
-                    .join(Membership, Membership.tenant_id == Tenant.id)
-                    .where(Membership.user_id == user.id, Membership.status == 1)
-                    .order_by(Tenant.id)
-                    .limit(1)
-                )
-            ).scalar_one_or_none()
+            tenant = (await session.execute(select(Tenant).join(Membership, Membership.tenant_id == Tenant.id).where(Membership.user_id == user.id, Membership.status == 1).order_by(Tenant.id).limit(1))).scalar_one_or_none()
             if tenant is None:
-                tenant = (
-                    await session.execute(select(Tenant).order_by(Tenant.id).limit(1))
-                ).scalar_one_or_none()
+                tenant = (await session.execute(select(Tenant).order_by(Tenant.id).limit(1))).scalar_one_or_none()
                 if tenant is None:
                     raise SystemExit("no tenant rows exist — bootstrap did not run")
 
-            workspace = (
-                await session.execute(
-                    select(Workspace)
-                    .where(Workspace.tenant_id == tenant.id)
-                    .order_by(Workspace.id)
-                    .limit(1)
-                )
-            ).scalar_one_or_none()
+            workspace = (await session.execute(select(Workspace).where(Workspace.tenant_id == tenant.id).order_by(Workspace.id).limit(1))).scalar_one_or_none()
 
             identity = await build_identity_for_user(session, user, tenant, workspace)
     finally:

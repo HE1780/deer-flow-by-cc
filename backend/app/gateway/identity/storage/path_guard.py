@@ -80,9 +80,7 @@ def assert_within_tenant_root(p: Path, tenant_id: int) -> None:
     root = tenant_root(tenant_id).resolve()
     resolved = Path(p).resolve()
     if not resolved.is_relative_to(root):
-        raise PathEscapeError(
-            f"path {resolved!s} escapes tenant {tenant_id} root {root!s}"
-        )
+        raise PathEscapeError(f"path {resolved!s} escapes tenant {tenant_id} root {root!s}")
 
 
 def safe_join(root: Path, *segments: str) -> Path:
@@ -108,32 +106,22 @@ def safe_join(root: Path, *segments: str) -> Path:
 
     for seg in segments:
         if not isinstance(seg, str):
-            raise PathEscapeError(
-                f"segment must be str, got {type(seg).__name__}: {seg!r}"
-            )
+            raise PathEscapeError(f"segment must be str, got {type(seg).__name__}: {seg!r}")
         if seg == "":
             raise PathEscapeError("segment must not be empty")
         if "\0" in seg:
-            raise PathEscapeError(
-                f"segment must not contain NUL, got {seg!r}"
-            )
+            raise PathEscapeError(f"segment must not contain NUL, got {seg!r}")
         if seg.startswith("/") or seg.startswith("\\") or Path(seg).is_absolute():
-            raise PathEscapeError(
-                f"segment must not be absolute, got {seg!r}"
-            )
+            raise PathEscapeError(f"segment must not be absolute, got {seg!r}")
         # Split on BOTH separators so Windows-style inputs like
         # "foo\\..\\bar" are caught even on POSIX hosts.
         parts = seg.replace("\\", "/").split("/")
         if any(part == ".." for part in parts):
-            raise PathEscapeError(
-                f"segment must not contain '..', got {seg!r}"
-            )
+            raise PathEscapeError(f"segment must not contain '..', got {seg!r}")
 
     joined = root_resolved.joinpath(*segments).resolve()
     if not joined.is_relative_to(root_resolved):
-        raise PathEscapeError(
-            f"joined path {joined!s} escapes root {root_resolved!s}"
-        )
+        raise PathEscapeError(f"joined path {joined!s} escapes root {root_resolved!s}")
     return joined
 
 
@@ -165,6 +153,4 @@ def assert_symlink_parent_safe(symlink: Path, allowed_root: Path) -> None:
     resolved = symlink.resolve()
     root_resolved = Path(allowed_root).resolve()
     if not resolved.is_relative_to(root_resolved):
-        raise PathEscapeError(
-            f"symlink {symlink!s} -> {resolved!s} escapes allowed root {root_resolved!s}"
-        )
+        raise PathEscapeError(f"symlink {symlink!s} -> {resolved!s} escapes allowed root {root_resolved!s}")

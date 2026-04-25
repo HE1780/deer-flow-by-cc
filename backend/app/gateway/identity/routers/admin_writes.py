@@ -7,10 +7,9 @@ These complement ``routers/admin.py`` (read-only) and ``routers/me.py``
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
-
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, field_validator
@@ -136,9 +135,7 @@ async def create_user(
     Idempotency: if a user with the same email exists, reuse the row and just
     add the membership. If they're already a member, return 409.
     """
-    existing = (
-        await session.execute(select(User).where(User.email == body.email))
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing is None:
         user = User(
             email=body.email,
@@ -193,30 +190,18 @@ async def add_workspace_member(
         await session.execute(select(Workspace).where(Workspace.id == wid)),
         tid,
     )
-    user = (
-        await session.execute(select(User).where(User.id == body.user_id))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.id == body.user_id))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
 
-    membership = (
-        await session.execute(
-            select(Membership).where(
-                Membership.user_id == user.id, Membership.tenant_id == tid
-            )
-        )
-    ).scalar_one_or_none()
+    membership = (await session.execute(select(Membership).where(Membership.user_id == user.id, Membership.tenant_id == tid))).scalar_one_or_none()
     if membership is None:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             "user is not a member of this tenant",
         )
 
-    role = (
-        await session.execute(
-            select(Role).where(Role.role_key == body.role, Role.scope == "workspace")
-        )
-    ).scalar_one_or_none()
+    role = (await session.execute(select(Role).where(Role.role_key == body.role, Role.scope == "workspace"))).scalar_one_or_none()
     if role is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown workspace role")
 
@@ -279,18 +264,12 @@ async def patch_workspace_member(
     if member is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "member not found")
 
-    role = (
-        await session.execute(
-            select(Role).where(Role.role_key == body.role, Role.scope == "workspace")
-        )
-    ).scalar_one_or_none()
+    role = (await session.execute(select(Role).where(Role.role_key == body.role, Role.scope == "workspace"))).scalar_one_or_none()
     if role is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown workspace role")
     member.role_id = role.id
 
-    user = (
-        await session.execute(select(User).where(User.id == uid))
-    ).scalar_one_or_none()
+    user = (await session.execute(select(User).where(User.id == uid))).scalar_one_or_none()
     if user is None:  # pragma: no cover — defensive
         raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
 
@@ -372,9 +351,7 @@ async def revoke_tenant_token(
     request: Request,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    token = (
-        await session.execute(select(ApiToken).where(ApiToken.id == token_id))
-    ).scalar_one_or_none()
+    token = (await session.execute(select(ApiToken).where(ApiToken.id == token_id))).scalar_one_or_none()
     if token is None or token.tenant_id != tid:
         # Generic 404 keeps cross-tenant existence opaque.
         raise HTTPException(status.HTTP_404_NOT_FOUND, "token not found")
@@ -450,9 +427,7 @@ async def create_tenant(
     body: CreateTenantIn,
     session: AsyncSession = Depends(get_session),
 ) -> TenantOut:
-    existing = (
-        await session.execute(select(Tenant).where(Tenant.slug == body.slug))
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(Tenant).where(Tenant.slug == body.slug))).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "slug already in use")
     tenant = Tenant(slug=body.slug, name=body.name)
@@ -472,9 +447,7 @@ async def update_tenant(
     body: PatchTenantIn,
     session: AsyncSession = Depends(get_session),
 ) -> TenantOut:
-    tenant = (
-        await session.execute(select(Tenant).where(Tenant.id == tid))
-    ).scalar_one_or_none()
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tid))).scalar_one_or_none()
     if tenant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "tenant not found")
     tenant.name = body.name
@@ -491,9 +464,7 @@ async def delete_tenant(
     tid: int,
     session: AsyncSession = Depends(get_session),
 ) -> Response:
-    tenant = (
-        await session.execute(select(Tenant).where(Tenant.id == tid))
-    ).scalar_one_or_none()
+    tenant = (await session.execute(select(Tenant).where(Tenant.id == tid))).scalar_one_or_none()
     if tenant is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "tenant not found")
     # No deleted_at column; soft-deactivate by flipping status to 0.
@@ -562,13 +533,7 @@ async def create_workspace(
     body: CreateWorkspaceIn,
     session: AsyncSession = Depends(get_session),
 ) -> WorkspaceOut:
-    existing = (
-        await session.execute(
-            select(Workspace).where(
-                Workspace.tenant_id == tid, Workspace.slug == body.slug
-            )
-        )
-    ).scalar_one_or_none()
+    existing = (await session.execute(select(Workspace).where(Workspace.tenant_id == tid, Workspace.slug == body.slug))).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "slug already in use")
     ws = Workspace(tenant_id=tid, slug=body.slug, name=body.name)

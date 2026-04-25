@@ -44,9 +44,7 @@ def get_uploads_dir(
     used verbatim — keeps flag-off / anonymous callers unaffected.
     """
     validate_thread_id(thread_id)
-    return get_paths().resolve_sandbox_uploads_dir(
-        thread_id, tenant_id=tenant_id, workspace_id=workspace_id
-    )
+    return get_paths().resolve_sandbox_uploads_dir(thread_id, tenant_id=tenant_id, workspace_id=workspace_id)
 
 
 def ensure_uploads_dir(

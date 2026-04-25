@@ -180,9 +180,7 @@ async def get_artifact(thread_id: str, path: str, request: Request, download: bo
             # so the client can't probe for path-shape hints. 400s pass through
             # unchanged — they describe bad input, not policy decisions.
             try:
-                actual = resolve_thread_virtual_path(
-                    thread_id, virtual_path, tenant_id=tid, workspace_id=wid
-                )
+                actual = resolve_thread_virtual_path(thread_id, virtual_path, tenant_id=tid, workspace_id=wid)
             except HTTPException as exc:
                 if exc.status_code == 403:
                     logger.warning(
