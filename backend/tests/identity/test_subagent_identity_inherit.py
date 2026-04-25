@@ -12,6 +12,7 @@ restore the real module at session scope via a local fixture.
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from unittest.mock import MagicMock
 
@@ -89,7 +90,7 @@ def test_parent_identity_flows_into_initial_state():
     identity = _Identity(permissions={"thread:write", "thread:read"})
     executor = _make_executor(identity=identity)
 
-    state = executor._build_initial_state("do the thing")
+    state = asyncio.run(executor._build_initial_state("do the thing"))
     assert state["identity"] is identity
     assert state["identity"].permissions == frozenset({"thread:write", "thread:read"})
 
@@ -97,7 +98,7 @@ def test_parent_identity_flows_into_initial_state():
 def test_identity_absent_does_not_add_key():
     """Flag-off / legacy mode: no identity on parent → subagent state is clean."""
     executor = _make_executor(identity=None)
-    state = executor._build_initial_state("do the thing")
+    state = asyncio.run(executor._build_initial_state("do the thing"))
     assert "identity" not in state
 
 
@@ -111,7 +112,7 @@ def test_subagent_cannot_elevate_permissions():
     """frozenset — no mutation API. Structural regression guard."""
     identity = _Identity(permissions={"thread:read"})
     executor = _make_executor(identity=identity)
-    state = executor._build_initial_state("task")
+    state = asyncio.run(executor._build_initial_state("task"))
 
     with pytest.raises(AttributeError):
         state["identity"].permissions.add("admin:write")  # type: ignore[attr-defined]
@@ -128,7 +129,7 @@ def test_identity_guardrail_sees_inherited_permissions():
 
     identity = _Identity(permissions={"thread:read"})  # no write perm
     executor = _make_executor(identity=identity)
-    subagent_state = executor._build_initial_state("please run bash")
+    subagent_state = asyncio.run(executor._build_initial_state("please run bash"))
 
     mw = IdentityGuardrailMiddleware()
     req = SimpleNamespace(
@@ -154,7 +155,7 @@ def test_inherited_permissions_allow_what_parent_can_do():
 
     identity = _Identity(permissions={"thread:write"})
     executor = _make_executor(identity=identity)
-    subagent_state = executor._build_initial_state("please run bash")
+    subagent_state = asyncio.run(executor._build_initial_state("please run bash"))
 
     mw = IdentityGuardrailMiddleware()
     req = SimpleNamespace(

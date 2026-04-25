@@ -15,6 +15,7 @@ path that isn't already covered.
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -163,7 +164,7 @@ def test_subagent_inherits_identity_through_guardrail():
             parent_model="gpt-4",
             identity=identity,
         )
-        subagent_state = executor._build_initial_state("run bash")
+        subagent_state = asyncio.run(executor._build_initial_state("run bash"))
 
         guardrail = IdentityGuardrailMiddleware()
         req = _tool_call("bash")
