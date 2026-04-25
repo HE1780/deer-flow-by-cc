@@ -174,18 +174,18 @@ function Inner() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Time (UTC)</TableHead>
-            <TableHead>Actor</TableHead>
-            <TableHead>Action</TableHead>
-            <TableHead>Resource</TableHead>
-            <TableHead>Result</TableHead>
+            <TableHead>{t.admin.table.colTimeUtc}</TableHead>
+            <TableHead>{t.admin.table.colActor}</TableHead>
+            <TableHead>{t.admin.table.colAction}</TableHead>
+            <TableHead>{t.admin.table.colResource}</TableHead>
+            <TableHead>{t.admin.table.colResult}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
@@ -238,7 +238,7 @@ function Inner() {
           disabled={cursorStack.length <= 1}
           onClick={() => setCursorStack(cursorStack.slice(0, -1))}
         >
-          Prev
+          {t.admin.table.prev}
         </button>
         <button
           type="button"
@@ -249,7 +249,7 @@ function Inner() {
               setCursorStack([...cursorStack, data.next_cursor]);
           }}
         >
-          Next
+          {t.admin.table.next}
         </button>
       </footer>
 
@@ -270,6 +270,7 @@ function AuditDetailDialog({
   row: AuditRow;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -286,20 +287,20 @@ function AuditDetailDialog({
           </DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-          <Detail label="Result" value={row.result} />
-          <Detail label="User id" value={row.user_id ?? "—"} />
-          <Detail label="Tenant id" value={row.tenant_id ?? "—"} />
-          <Detail label="Workspace id" value={row.workspace_id ?? "—"} />
-          <Detail label="Thread id" value={row.thread_id ?? "—"} />
-          <Detail label="Resource type" value={row.resource_type ?? "—"} />
-          <Detail label="Resource id" value={row.resource_id ?? "—"} />
-          <Detail label="IP" value={row.ip ?? "—"} />
-          <Detail label="User agent" value={row.user_agent ?? "—"} />
-          <Detail label="Duration" value={row.duration_ms != null ? `${row.duration_ms} ms` : "—"} />
-          <Detail label="Error code" value={row.error_code ?? "—"} />
+          <Detail label={t.admin.audit.detailResult} value={row.result} />
+          <Detail label={t.admin.audit.detailUserId} value={row.user_id ?? "—"} />
+          <Detail label={t.admin.audit.detailTenantId} value={row.tenant_id ?? "—"} />
+          <Detail label={t.admin.audit.detailWorkspaceId} value={row.workspace_id ?? "—"} />
+          <Detail label={t.admin.audit.detailThreadId} value={row.thread_id ?? "—"} />
+          <Detail label={t.admin.audit.detailResourceType} value={row.resource_type ?? "—"} />
+          <Detail label={t.admin.audit.detailResourceId} value={row.resource_id ?? "—"} />
+          <Detail label={t.admin.audit.detailIp} value={row.ip ?? "—"} />
+          <Detail label={t.admin.audit.detailUserAgent} value={row.user_agent ?? "—"} />
+          <Detail label={t.admin.audit.detailDuration} value={row.duration_ms != null ? `${row.duration_ms} ms` : "—"} />
+          <Detail label={t.admin.audit.detailErrorCode} value={row.error_code ?? "—"} />
         </dl>
         <div>
-          <p className="mb-1 text-sm font-medium">Metadata</p>
+          <p className="mb-1 text-sm font-medium">{t.admin.audit.detailMetadata}</p>
           <pre
             className="max-h-64 overflow-auto rounded-md border bg-muted/40 p-3 text-xs"
             data-testid="audit-detail-metadata"
@@ -309,7 +310,7 @@ function AuditDetailDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button type="button">Close</Button>
+            <Button type="button">{t.admin.audit.close}</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>

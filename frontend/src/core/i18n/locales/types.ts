@@ -450,6 +450,28 @@ export interface Translations {
       resultSuccess: string;
       resultFailure: string;
       noEvents: string;
+      detailResult: string;
+      detailUserId: string;
+      detailTenantId: string;
+      detailWorkspaceId: string;
+      detailThreadId: string;
+      detailResourceType: string;
+      detailResourceId: string;
+      detailIp: string;
+      detailUserAgent: string;
+      detailDuration: string;
+      detailErrorCode: string;
+      detailMetadata: string;
+      close: string;
+    };
+    tokens: {
+      showRevoked: string;
+      createTitle: string;
+      createDesc: string;
+      nameLabel: string;
+      scopesLabel: string;
+      createdTitle: string;
+      createdDesc: string;
     };
     tenantSwitcher: {
       label: string;

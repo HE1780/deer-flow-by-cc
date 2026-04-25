@@ -77,7 +77,7 @@ function Inner() {
               checked={includeRevoked}
               onChange={(e) => setIncludeRevoked(e.target.checked)}
             />
-            Show revoked
+            {t.admin.tokens.showRevoked}
           </label>
           {canCreate && (
             <Button
@@ -93,11 +93,11 @@ function Inner() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Prefix</TableHead>
-            <TableHead>Scopes</TableHead>
-            <TableHead>Last used</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>{t.admin.table.colName}</TableHead>
+            <TableHead>{t.admin.table.colPrefix}</TableHead>
+            <TableHead>{t.admin.table.colScopes}</TableHead>
+            <TableHead>{t.admin.table.colLastUsed}</TableHead>
+            <TableHead>{t.admin.table.colStatus}</TableHead>
             {canRevoke && <TableHead aria-label="actions" />}
           </TableRow>
         </TableHeader>
@@ -105,31 +105,31 @@ function Inner() {
           {isLoading && (
             <TableRow>
               <TableCell colSpan={6} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
-          {data?.items.map((t) => (
-            <TableRow key={t.id} data-testid={`token-row-${t.id}`}>
-              <TableCell>{t.name}</TableCell>
-              <TableCell className="font-mono text-xs">{t.prefix}</TableCell>
+          {data?.items.map((tok) => (
+            <TableRow key={tok.id} data-testid={`token-row-${tok.id}`}>
+              <TableCell>{tok.name}</TableCell>
+              <TableCell className="font-mono text-xs">{tok.prefix}</TableCell>
               <TableCell className="flex flex-wrap gap-1">
-                {t.scopes.map((s) => (
+                {tok.scopes.map((s) => (
                   <PermBadge key={s} perm={s} />
                 ))}
               </TableCell>
-              <TableCell>{t.last_used_at?.slice(0, 10) ?? "—"}</TableCell>
+              <TableCell>{tok.last_used_at?.slice(0, 10) ?? "—"}</TableCell>
               <TableCell>
-                {t.revoked_at
-                  ? `revoked ${t.revoked_at.slice(0, 10)}`
-                  : t.expires_at
-                    ? `expires ${t.expires_at.slice(0, 10)}`
-                    : "active"}
+                {tok.revoked_at
+                  ? `${t.admin.table.statusRevoked} ${tok.revoked_at.slice(0, 10)}`
+                  : tok.expires_at
+                    ? `expires ${tok.expires_at.slice(0, 10)}`
+                    : t.admin.table.statusActive}
               </TableCell>
               {canRevoke && (
                 <TableCell>
-                  {!t.revoked_at && tid && (
-                    <RevokeButton tenantId={tid} tokenId={t.id} />
+                  {!tok.revoked_at && tid && (
+                    <RevokeButton tenantId={tid} tokenId={tok.id} />
                   )}
                 </TableCell>
               )}
@@ -144,7 +144,7 @@ function Inner() {
           disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         >
-          Prev
+          {t.admin.table.prev}
         </button>
         <button
           type="button"
@@ -152,7 +152,7 @@ function Inner() {
           disabled={!data || offset + PAGE_SIZE >= data.total}
           onClick={() => setOffset(offset + PAGE_SIZE)}
         >
-          Next
+          {t.admin.table.next}
         </button>
       </footer>
 
@@ -186,8 +186,9 @@ function CreateTokenDialog({
   tenantId: number;
   callerUserId: number;
   onClose: () => void;
-  onCreated: (t: CreateTokenResult) => void;
+  onCreated: (tok: CreateTokenResult) => void;
 }) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [scopesText, setScopesText] = useState("skill:invoke");
   const create = useCreateTenantToken(tenantId);
@@ -196,11 +197,8 @@ function CreateTokenDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="token-create-dialog">
         <DialogHeader>
-          <DialogTitle>Create API token</DialogTitle>
-          <DialogDescription>
-            The plaintext is shown once. Copy it now — we never store it in
-            recoverable form.
-          </DialogDescription>
+          <DialogTitle>{t.admin.tokens.createTitle}</DialogTitle>
+          <DialogDescription>{t.admin.tokens.createDesc}</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"
@@ -221,7 +219,7 @@ function CreateTokenDialog({
           }}
         >
           <label className="grid gap-1 text-sm">
-            <span>Name</span>
+            <span>{t.admin.tokens.nameLabel}</span>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -231,7 +229,7 @@ function CreateTokenDialog({
             />
           </label>
           <label className="grid gap-1 text-sm">
-            <span>Scopes (comma-separated)</span>
+            <span>{t.admin.tokens.scopesLabel}</span>
             <Input
               value={scopesText}
               onChange={(e) => setScopesText(e.target.value)}
@@ -247,7 +245,7 @@ function CreateTokenDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t.admin.actions.cancel}
               </Button>
             </DialogClose>
             <Button
@@ -255,7 +253,7 @@ function CreateTokenDialog({
               disabled={create.isPending || !name.trim()}
               data-testid="token-submit-btn"
             >
-              {create.isPending ? "Creating…" : "Create"}
+              {create.isPending ? "Creating…" : t.admin.actions.newToken}
             </Button>
           </DialogFooter>
         </form>
@@ -271,16 +269,17 @@ function PlaintextDialog({
   token: CreateTokenResult;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="token-plaintext-dialog">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <KeyIcon className="size-5" /> Token created
+            <KeyIcon className="size-5" /> {t.admin.tokens.createdTitle}
           </DialogTitle>
           <DialogDescription>
-            Copy this value now — once you close this dialog, only the prefix
-            <span className="font-mono"> {token.prefix} </span> remains.
+            {t.admin.tokens.createdDesc}{" "}
+            <span className="font-mono">{token.prefix}</span>
           </DialogDescription>
         </DialogHeader>
         <CopyableSecret
@@ -291,7 +290,7 @@ function PlaintextDialog({
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" data-testid="token-plaintext-close-btn">
-              Done
+              {t.admin.actions.done}
             </Button>
           </DialogClose>
         </DialogFooter>
@@ -301,10 +300,11 @@ function PlaintextDialog({
 }
 
 function RevokeButton({ tenantId, tokenId }: { tenantId: number; tokenId: number }) {
+  const { t } = useI18n();
   const revoke = useRevokeTenantToken(tenantId);
   return (
     <InlineConfirm
-      label="Revoke"
+      label={t.admin.actions.revoke}
       onConfirm={() => revoke.mutate(tokenId)}
       pending={revoke.isPending}
       triggerTestId={`token-revoke-${tokenId}`}
