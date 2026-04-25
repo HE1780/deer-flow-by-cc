@@ -1,0 +1,128 @@
+name: Identity E2E Smoke
+
+on:
+  push:
+    branches: [ 'main' ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/identity-e2e-smoke.yml'
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/identity-e2e-smoke.yml'
+
+concurrency:
+  group: identity-e2e-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: deerflow
+          POSTGRES_USER: deerflow
+          POSTGRES_PASSWORD: deerflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U deerflow -d deerflow"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ENABLE_IDENTITY: "true"
+      DEERFLOW_DATABASE_URL: postgresql+asyncpg://deerflow:deerflow@localhost:5432/deerflow
+      DEERFLOW_REDIS_URL: redis://localhost:6379/0
+      DEERFLOW_BOOTSTRAP_ADMIN_EMAIL: admin@smoke.test
+      DEERFLOW_INTERNAL_SIGNING_KEY: smoke-test-signing-key-32chars!!
+      DEERFLOW_COOKIE_SECURE: "false"
+      DEER_FLOW_HOME: ${{ github.workspace }}/backend/.deer-flow
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --group dev
+
+      - name: Alembic upgrade head
+        working-directory: backend
+        run: PYTHONPATH=. uv run alembic upgrade head
+
+      - name: Generate RS256 keypair
+        working-directory: backend
+        run: make identity-keys
+
+      - name: Bootstrap platform admin
+        working-directory: backend
+        run: PYTHONPATH=. uv run python -m app.gateway.identity.cli bootstrap
+
+      - name: Start Gateway
+        working-directory: backend
+        run: |
+          PYTHONPATH=. uv run uvicorn app.gateway.app:app \
+            --host 127.0.0.1 --port 8001 \
+            > gateway.log 2>&1 &
+          echo $! > gateway.pid
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8001/health > /dev/null; then
+              echo "gateway is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "gateway did not come up"
+          cat backend/gateway.log || true
+          exit 1
+
+      - name: Run identity smoke test
+        working-directory: backend
+        run: PYTHONPATH=. uv run python scripts/ci/identity_smoke_test.py
+
+      - name: Stop Gateway
+        if: always()
+        working-directory: backend
+        run: |
+          if [ -f gateway.pid ]; then
+            kill $(cat gateway.pid) 2>/dev/null || true
+            rm -f gateway.pid
+          fi
+
+      - name: Upload gateway log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-log
+          path: backend/gateway.log
+          if-no-files-found: ignore
