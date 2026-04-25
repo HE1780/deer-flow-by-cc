@@ -19,6 +19,7 @@ from app.gateway.identity.auth.oidc import OIDCClient
 from app.gateway.identity.auth.runtime import AuthRuntime, clear_runtime, set_runtime
 from app.gateway.identity.auth.session import SessionStore
 from app.gateway.identity.bootstrap_lock import bootstrap_with_advisory_lock
+from app.gateway.identity.tasks.org_key_rotation import start_rotation_task, stop_rotation_task
 from app.gateway.identity.db import clear_global_engine, create_engine_and_sessionmaker, set_global_engine
 from app.gateway.identity.middlewares.identity import IdentityMiddleware
 from app.gateway.identity.middlewares.tenant_scope import install_auto_filter
@@ -228,8 +229,30 @@ async def _init_audit_subsystem(app: FastAPI) -> None:
 
     logger.info("audit batch writer started")
 
+    # Start the org key auto-rotation background task (polls every hour).
+    if _identity_db._sessionmaker is not None:
+        rotation_task, rotation_stop = start_rotation_task(
+            _identity_db._sessionmaker,
+            writer=writer,
+        )
+        app.state.org_key_rotation_task = rotation_task
+        app.state.org_key_rotation_stop = rotation_stop
+        logger.info("org key rotation task started")
+
 
 async def _shutdown_audit_subsystem(app: FastAPI) -> None:
+    # Stop the org key rotation task first (it depends on the writer).
+    rotation_task = getattr(app.state, "org_key_rotation_task", None)
+    rotation_stop = getattr(app.state, "org_key_rotation_stop", None)
+    if rotation_task is not None and rotation_stop is not None:
+        try:
+            await stop_rotation_task(rotation_task, rotation_stop)
+        except Exception:
+            logger.debug("org key rotation task stop failed", exc_info=True)
+        app.state.org_key_rotation_task = None
+        app.state.org_key_rotation_stop = None
+        logger.info("org key rotation task stopped")
+
     writer = getattr(app.state, "audit_writer", None)
     if writer is None:
         return

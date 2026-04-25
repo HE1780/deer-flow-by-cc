@@ -7,6 +7,7 @@ reads.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -322,7 +323,7 @@ def _org_key_row(row: Any, *, include_plaintext: str | None = None) -> dict:
 
 @router.get(
     "/api/admin/org-keys",
-    dependencies=[Depends(requires("membership:read", "platform"))],
+    dependencies=[Depends(requires("token:read", "tenant"))],
 )
 async def list_org_keys(
     request: Request,
@@ -349,7 +350,7 @@ async def list_org_keys(
 
 @router.post(
     "/api/admin/org-keys",
-    dependencies=[Depends(requires("membership:read", "platform"))],
+    dependencies=[Depends(requires("token:create", "tenant"))],
     status_code=201,
 )
 async def create_org_key(
@@ -387,8 +388,6 @@ async def create_org_key(
                   last_used_at, revoked_at, created_at
         """
     )
-    import json
-
     result = await session.execute(
         insert_stmt,
         {
@@ -431,7 +430,7 @@ async def create_org_key(
 
 @router.delete(
     "/api/admin/org-keys/{key_id}",
-    dependencies=[Depends(requires("membership:read", "platform"))],
+    dependencies=[Depends(requires("token:revoke", "tenant"))],
 )
 async def revoke_org_key(
     key_id: int,
@@ -541,7 +540,7 @@ async def approve_skill(
     """Approve a pending skill: set status='active', reviewed_by, reviewed_at."""
     # Verify skill exists and is pending
     check = await session.execute(
-        text("SELECT id, name, version, scope, status FROM identity.skill_registry WHERE id = :id"),
+        text("SELECT id, name, version, scope, status, tenant_id FROM identity.skill_registry WHERE id = :id"),
         {"id": skill_id},
     )
     row = check.mappings().one_or_none()
@@ -562,16 +561,20 @@ async def approve_skill(
         {"reviewed_by": identity.user_id, "reviewed_at": now, "id": skill_id},
     )
 
-    # Set is_default=true if this (name, scope) has no other active version
+    # Set is_default=true if this (name, scope) has no other active version.
+    # For org-scoped skills, restrict the check to the same tenant so that
+    # one tenant's active skill does not affect another tenant's default flag.
+    skill_tenant_id = row["tenant_id"]
     default_check = await session.execute(
         text(
             """
             SELECT id FROM identity.skill_registry
             WHERE name = :name AND scope = :scope AND status = 'active' AND id != :id
+              AND ((:scope = 'public') OR (tenant_id = :tenant_id))
             LIMIT 1
             """
         ),
-        {"name": row["name"], "scope": row["scope"], "id": skill_id},
+        {"name": row["name"], "scope": row["scope"], "id": skill_id, "tenant_id": skill_tenant_id},
     )
     if default_check.fetchone() is None:
         # No other active version → mark this one as default
@@ -679,11 +682,12 @@ async def get_skill_review_status(
             SELECT id, name, version, scope, status, rejection_reason, created_by
             FROM identity.skill_registry
             WHERE name = :name
+              AND (scope = 'public' OR tenant_id = :caller_tenant_id OR owner_id = :caller_user_id)
             ORDER BY created_at DESC
             LIMIT 1
             """
         ),
-        {"name": skill_name},
+        {"name": skill_name, "caller_tenant_id": identity.tenant_id, "caller_user_id": identity.user_id},
     )
     row = stmt.mappings().one_or_none()
     if row is None:

@@ -1,7 +1,7 @@
 """Add skill_registry and org_api_keys tables (阶段5.1a).
 
 Revision ID: 20260425_0005_skill_registry_org_api_keys
-Revises: 20260421_0003
+Revises: 20260425_0004
 Create Date: 2026-04-25
 """
 
@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20260425_0005_skill_registry_org_api_keys"
-down_revision: str | None = "20260421_0003"
+down_revision: str | None = "20260425_0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

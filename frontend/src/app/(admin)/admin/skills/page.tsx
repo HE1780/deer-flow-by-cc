@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getBackendBaseURL } from "@/core/config";
+import { identityFetch } from "@/core/identity/fetcher";
 import { useEnableSkill, useSkills } from "@/core/skills/hooks";
 import type { Skill } from "@/core/skills/type";
 
@@ -34,41 +35,35 @@ interface PendingSkill {
 }
 
 async function fetchPendingSkills(): Promise<PendingSkill[]> {
-  const res = await fetch(`${getBackendBaseURL()}/api/admin/skills/pending`);
-  if (!res.ok) throw new Error(`Failed to load pending skills (${res.status})`);
-  const data = (await res.json()) as { skills: PendingSkill[] };
+  const data = await identityFetch<{ skills: PendingSkill[] }>(
+    `${getBackendBaseURL()}/api/admin/skills/pending`,
+  );
   return data.skills;
 }
 
 async function approveSkill(id: number): Promise<void> {
-  const res = await fetch(`${getBackendBaseURL()}/api/admin/skills/${id}/approve`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(err.detail ?? `Approve failed (${res.status})`);
-  }
+  await identityFetch<unknown>(
+    `${getBackendBaseURL()}/api/admin/skills/${id}/approve`,
+    { method: "POST", body: "{}" },
+  );
 }
 
 async function rejectSkill(id: number, reason: string): Promise<void> {
-  const res = await fetch(`${getBackendBaseURL()}/api/admin/skills/${id}/reject`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { detail?: string };
-    throw new Error(err.detail ?? `Reject failed (${res.status})`);
-  }
+  await identityFetch<unknown>(
+    `${getBackendBaseURL()}/api/admin/skills/${id}/reject`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
 }
 
 async function installSkillFile(file: File): Promise<void> {
   const form = new FormData();
   form.append("file", file);
+  // FormData upload: use raw fetch with credentials (identityFetch sets
+  // content-type to application/json when body is present, which would
+  // break multipart; use fetch directly here with credentials only).
   const res = await fetch(`${getBackendBaseURL()}/api/skills/install`, {
     method: "POST",
+    credentials: "include",
     body: form,
   });
   if (!res.ok) {

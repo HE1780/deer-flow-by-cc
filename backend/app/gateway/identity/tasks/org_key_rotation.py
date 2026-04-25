@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import secrets
@@ -155,3 +156,82 @@ async def rotate_expired_permanent_keys(
             await session.commit()
 
     return count
+
+
+# ---------------------------------------------------------------------------
+# Scheduling wrapper
+# ---------------------------------------------------------------------------
+
+
+async def _rotation_loop(
+    session_maker: async_sessionmaker,
+    *,
+    writer: AuditBatchWriter | None = None,
+    rotate_interval_days: int = _DEFAULT_ROTATE_INTERVAL_DAYS,
+    poll_interval_sec: float = 3600.0,
+    stop_event: asyncio.Event,
+) -> None:
+    """Run the rotation check every ``poll_interval_sec`` seconds until stopped.
+
+    Errors inside a single run don't crash the loop — they are logged and
+    the next poll runs after the usual wait.
+    """
+    while not stop_event.is_set():
+        try:
+            await rotate_expired_permanent_keys(
+                session_maker,
+                writer=writer,
+                rotate_interval_days=rotate_interval_days,
+            )
+        except Exception:
+            logger.exception("org key rotation iteration failed")
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=poll_interval_sec)
+        except TimeoutError:
+            continue
+
+
+def start_rotation_task(
+    session_maker: async_sessionmaker,
+    *,
+    writer: AuditBatchWriter | None = None,
+    rotate_interval_days: int = _DEFAULT_ROTATE_INTERVAL_DAYS,
+    poll_interval_sec: float = 3600.0,
+) -> tuple[asyncio.Task, asyncio.Event]:
+    """Spawn the rotation loop as an asyncio Task.
+
+    Returns ``(task, stop_event)``.  Signal the stop_event to gracefully
+    terminate the loop; then ``await task`` to confirm it finished.
+    """
+    stop = asyncio.Event()
+    task = asyncio.create_task(
+        _rotation_loop(
+            session_maker,
+            writer=writer,
+            rotate_interval_days=rotate_interval_days,
+            poll_interval_sec=poll_interval_sec,
+            stop_event=stop,
+        ),
+        name="org-key-rotation",
+    )
+    return task, stop
+
+
+async def stop_rotation_task(
+    task: asyncio.Task,
+    stop_event: asyncio.Event,
+    *,
+    timeout_sec: float = 5.0,
+) -> None:
+    """Signal the rotation loop to stop and wait for it to finish.
+
+    Args:
+        task: The asyncio.Task returned by ``start_rotation_task``.
+        stop_event: The asyncio.Event returned by ``start_rotation_task``.
+        timeout_sec: Maximum seconds to wait before giving up.
+    """
+    stop_event.set()
+    try:
+        await asyncio.wait_for(task, timeout=timeout_sec)
+    except (TimeoutError, asyncio.CancelledError):
+        logger.warning("org key rotation task did not finish cleanly within %.1fs", timeout_sec)
