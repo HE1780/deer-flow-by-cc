@@ -22,11 +22,17 @@ class ChannelStore:
             "<channel_name>:<chat_id>": {
                 "thread_id": "<uuid>",
                 "user_id": "<platform_user>",
+                "tenant_id": 1,
+                "workspace_id": 2,
                 "created_at": 1700000000.0,
                 "updated_at": 1700000000.0
             },
             ...
         }
+
+    ``tenant_id`` / ``workspace_id`` are nullable; when ``ENABLE_IDENTITY`` is
+    off (or the channel config omits them) they are stored as ``null`` and
+    downstream resolvers fall back to the legacy flat path.
 
     The store is intentionally simple — a single JSON file that is atomically
     rewritten on every mutation. For production workloads with high concurrency,
@@ -79,6 +85,28 @@ class ChannelStore:
 
     # -- public API --------------------------------------------------------
 
+    def get_thread_mapping(
+        self,
+        channel_name: str,
+        chat_id: str,
+        *,
+        topic_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        """Return the full stored entry (incl. ``tenant_id``/``workspace_id``).
+
+        Missing ``tenant_id`` / ``workspace_id`` keys (from entries written by
+        earlier versions) are read as ``None`` — callers rely on ``.get()``
+        semantics so pre-M7-followup ``store.json`` files remain readable.
+        """
+        entry = self._data.get(self._key(channel_name, chat_id, topic_id))
+        if entry is None:
+            return None
+        return {
+            **entry,
+            "tenant_id": entry.get("tenant_id"),
+            "workspace_id": entry.get("workspace_id"),
+        }
+
     def get_thread_id(self, channel_name: str, chat_id: str, topic_id: str | None = None) -> str | None:
         """Look up the DeerFlow thread_id for a given IM conversation/topic."""
         entry = self._data.get(self._key(channel_name, chat_id, topic_id))
@@ -92,8 +120,15 @@ class ChannelStore:
         *,
         topic_id: str | None = None,
         user_id: str = "",
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
     ) -> None:
-        """Create or update the mapping for an IM conversation/topic."""
+        """Create or update the mapping for an IM conversation/topic.
+
+        ``tenant_id`` / ``workspace_id`` are optional and default to ``None`` —
+        when ``ENABLE_IDENTITY=false`` (or the channel config omits them) the
+        legacy single-tenant mapping shape is preserved.
+        """
         with self._lock:
             key = self._key(channel_name, chat_id, topic_id)
             now = time.time()
@@ -101,6 +136,8 @@ class ChannelStore:
             self._data[key] = {
                 "thread_id": thread_id,
                 "user_id": user_id,
+                "tenant_id": tenant_id,
+                "workspace_id": workspace_id,
                 "created_at": existing["created_at"] if existing else now,
                 "updated_at": now,
             }

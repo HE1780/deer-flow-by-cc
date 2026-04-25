@@ -204,6 +204,55 @@ class TestChannelStore:
         store = ChannelStore(path=path)
         assert store.get_thread_id("x", "y") is None
 
+    def test_set_with_identity_persists_tenant_workspace(self, store):
+        store.set_thread_id(
+            "slack",
+            "ch1",
+            "thread-abc",
+            user_id="u1",
+            tenant_id=7,
+            workspace_id=3,
+        )
+        mapping = store.get_thread_mapping("slack", "ch1")
+        assert mapping is not None
+        assert mapping["thread_id"] == "thread-abc"
+        assert mapping["tenant_id"] == 7
+        assert mapping["workspace_id"] == 3
+
+    def test_get_thread_mapping_missing_returns_none(self, store):
+        assert store.get_thread_mapping("slack", "nonexistent") is None
+
+    def test_set_without_identity_stores_none(self, store):
+        store.set_thread_id("slack", "ch1", "thread-abc", user_id="u1")
+        mapping = store.get_thread_mapping("slack", "ch1")
+        assert mapping is not None
+        assert mapping["tenant_id"] is None
+        assert mapping["workspace_id"] is None
+
+    def test_get_thread_id_still_works_after_identity_persist(self, store):
+        # Back-compat: the legacy getter must keep returning the thread_id only.
+        store.set_thread_id("slack", "ch1", "t1", tenant_id=7, workspace_id=3)
+        assert store.get_thread_id("slack", "ch1") == "t1"
+
+    def test_legacy_entry_without_identity_keys_reads_as_none(self, tmp_path):
+        # Simulate a store.json written by the pre-M7-followup version.
+        path = tmp_path / "store.json"
+        legacy = {
+            "slack:ch1": {
+                "thread_id": "thread-legacy",
+                "user_id": "u1",
+                "created_at": 1700000000.0,
+                "updated_at": 1700000000.0,
+            }
+        }
+        path.write_text(json.dumps(legacy), encoding="utf-8")
+        store = ChannelStore(path=path)
+        mapping = store.get_thread_mapping("slack", "ch1")
+        assert mapping is not None
+        assert mapping["thread_id"] == "thread-legacy"
+        assert mapping.get("tenant_id") is None
+        assert mapping.get("workspace_id") is None
+
 
 # ---------------------------------------------------------------------------
 # Channel base class tests
