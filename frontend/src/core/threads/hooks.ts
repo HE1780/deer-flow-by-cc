@@ -490,6 +490,7 @@ export function useThreadStream({
             context: {
               ...extraContext,
               ...context,
+              agent_name: context.agent_name,
               thinking_enabled: context.mode !== "flash",
               is_plan_mode: context.mode === "pro" || context.mode === "ultra",
               subagent_enabled: context.mode === "ultra",
