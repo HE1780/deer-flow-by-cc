@@ -19,11 +19,11 @@ from deerflow.agents.middlewares.tool_error_handling_middleware import build_lea
 from deerflow.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from deerflow.agents.thread_state import ThreadState
 from deerflow.config.agents_config import AgentConfig, load_agent_config, validate_agent_name
-from deerflow.skills.manifest import load_skill_manifest_by_name, parse_skill_spec
 from deerflow.config.app_config import get_app_config
 from deerflow.config.memory_config import get_memory_config
 from deerflow.config.summarization_config import get_summarization_config
 from deerflow.models import create_chat_model
+from deerflow.skills.manifest import load_skill_manifest_by_name, parse_skill_spec
 
 logger = logging.getLogger(__name__)
 

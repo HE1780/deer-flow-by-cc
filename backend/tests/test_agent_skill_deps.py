@@ -1,10 +1,7 @@
-import os
 from unittest.mock import patch
 
-import pytest
-
 from deerflow.config.agents_config import AgentConfig
-from deerflow.skills.manifest import SkillManifest, EnvDeclaration
+from deerflow.skills.manifest import EnvDeclaration, SkillManifest
 
 
 def _make_manifest(requires_tools=None, requires_mcp=None, env=None):

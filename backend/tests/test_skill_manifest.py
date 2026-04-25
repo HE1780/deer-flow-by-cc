@@ -1,8 +1,7 @@
 import textwrap
 from pathlib import Path
-import pytest
 
-from deerflow.skills.manifest import SkillManifest, load_skill_manifest
+from deerflow.skills.manifest import load_skill_manifest
 
 
 def test_load_full_manifest(tmp_path: Path):
