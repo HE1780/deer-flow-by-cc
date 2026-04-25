@@ -30,6 +30,7 @@ from app.gateway.identity.routers import auth as identity_auth_router
 from app.gateway.identity.routers import internal as identity_internal_router
 from app.gateway.identity.routers import me as identity_me_router
 from app.gateway.identity.routers import metrics as identity_metrics_router
+from app.gateway.identity.routers import dev as identity_dev_router
 from app.gateway.identity.routers import roles as identity_roles_router
 from app.gateway.identity.routers import skills_publish as identity_skills_publish_router
 from app.gateway.identity.settings import get_identity_settings
@@ -45,6 +46,7 @@ from app.gateway.routers import (
     skills,
     suggestions,
     thread_runs,
+    thread_skills,
     threads,
     uploads,
 )
@@ -457,6 +459,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # Thread cleanup API is mounted at /api/threads/{thread_id}
     app.include_router(threads.router)
 
+    # Thread skills bind/unbind API
+    app.include_router(thread_skills.router)
+
     # Agents API is mounted at /api/agents
     app.include_router(agents.router)
 
@@ -494,6 +499,10 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
         app.include_router(identity_metrics_router.router)
         # Task 5.2a: skill publish endpoint (requires skill:publish scope)
         app.include_router(identity_skills_publish_router.router)
+        # Dev-only bootstrap login (only when DEERFLOW_DEV_LOGIN=true)
+        import os
+        if os.environ.get("DEERFLOW_DEV_LOGIN", "").lower() in {"1", "true", "yes"}:
+            app.include_router(identity_dev_router.router)
         # IdentityMiddleware first → executes innermost (sets state.identity).
         # AuditMiddleware after → executes outermost (sees the resolved
         # identity on the way out + records request duration end-to-end).

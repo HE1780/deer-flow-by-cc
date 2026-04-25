@@ -5,6 +5,8 @@ import {
   ChevronsUpDown,
   GlobeIcon,
   InfoIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
   MailIcon,
   Settings2Icon,
   SettingsIcon,
@@ -26,6 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/core/i18n/hooks";
+import { useIdentity } from "@/core/identity/hooks";
 
 import { GithubIcon } from "./github-icon";
 import { SettingsDialog } from "./settings";
@@ -50,6 +53,11 @@ function NavMenuButtonContent({
   );
 }
 
+async function logout() {
+  await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
+  window.location.href = "/login";
+}
+
 export function WorkspaceNavMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<
@@ -58,6 +66,12 @@ export function WorkspaceNavMenu() {
   const [mounted, setMounted] = useState(false);
   const { open: isSidebarOpen } = useSidebar();
   const { t } = useI18n();
+  const { identity } = useIdentity();
+
+  const isAdmin =
+    identity?.roles?.platform?.includes("platform_admin") ||
+    identity?.roles?.tenant?.includes("tenant_owner") ||
+    false;
 
   useEffect(() => {
     setMounted(true);
@@ -97,6 +111,19 @@ export function WorkspaceNavMenu() {
                     <Settings2Icon />
                     {t.common.settings}
                   </DropdownMenuItem>
+
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <a href="/admin/tenants">
+                        <DropdownMenuItem>
+                          <LayoutDashboardIcon />
+                          Admin Portal
+                        </DropdownMenuItem>
+                      </a>
+                    </>
+                  )}
+
                   <DropdownMenuSeparator />
                   <a
                     href="https://deerflow.tech/"
@@ -146,6 +173,24 @@ export function WorkspaceNavMenu() {
                   <InfoIcon />
                   {t.workspace.about}
                 </DropdownMenuItem>
+
+                {identity && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={logout}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <LogOutIcon />
+                      Sign out
+                      {identity.email ? (
+                        <span className="text-muted-foreground ml-auto max-w-28 truncate text-xs">
+                          {identity.email}
+                        </span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (

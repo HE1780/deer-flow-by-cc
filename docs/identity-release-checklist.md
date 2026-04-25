@@ -105,14 +105,20 @@ with the same PG + Redis).
 
 ## Known gaps to flag in the release notes
 
-At time of writing the release carries two still-open items (see
-`CHANGELOG.md`):
+Previously open items — now resolved (2026-04-25):
 
-- [ ] Admin UI (M7 Part A) is not shipped yet — operators must use
-  `make` targets and `/api/*` directly.
-- [ ] CI does not yet run an end-to-end identity smoke (PG + Redis +
-  mock OIDC) — exercise this checklist manually on staging before
-  every release until that workflow lands.
+- [x] Admin UI (M7 Part A) — all 14 admin routes shipped; Skills Hub,
+  password login, workspace auth gate all landed.
+- [x] CI identity e2e smoke — `identity-e2e-smoke` GH Actions workflow
+  committed; `issue_bootstrap_token.py` fixed to register Redis session.
+
+Remaining open items requiring manual staging verification:
+
+- [ ] Real Okta / Azure AD / Keycloak login (IdP smoke tests above).
+- [ ] Migration rehearsal on 1 000+ real threads.
+- [ ] Multi-replica bootstrap drill.
+- [ ] Rollback drill (flag on → off → legacy threads).
+- [ ] Identity test coverage ≥ 80% (`pytest --cov`).
 
 ## Sign-offs
 

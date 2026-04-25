@@ -1,12 +1,15 @@
-"""/api/auth/* routes: OIDC login / callback, refresh, logout."""
+"""/api/auth/* routes: OIDC login / callback, password login, refresh, logout."""
 
 from __future__ import annotations
 
 import logging
 import time
 
+import bcrypt
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from sqlalchemy import select
 
 from app.gateway.identity.auth.identity_factory import (
     build_identity_for_user,
@@ -25,6 +28,7 @@ from app.gateway.identity.auth.oidc import (
     StateMismatchError,
 )
 from app.gateway.identity.auth.runtime import get_runtime
+from app.gateway.identity.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +179,99 @@ async def logout(request: Request, response: Response):
         except Exception:
             pass
     response.delete_cookie(rt.cookie_name, path="/")
+    return {"status": "ok"}
+
+
+class PasswordLoginIn(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/login")
+async def password_login(body: PasswordLoginIn, request: Request, response: Response):
+    """Email + password login. Only works for users with a password_hash set."""
+    rt = get_runtime()
+    ip = _client_ip(request)
+    email = body.email.strip().lower()
+
+    if ip and await rt.lockout.is_blocked(ip=ip, email=email):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many failed login attempts")
+
+    async with rt.session_maker() as db:
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+
+    invalid = user is None or not user.password_hash or user.status != 1
+    if not invalid:
+        invalid = not bcrypt.checkpw(body.password.encode(), user.password_hash.encode())
+
+    if invalid:
+        if ip:
+            await rt.lockout.record_failure(ip=ip, email=email)
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid email or password")
+
+    async with rt.session_maker() as db:
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one()
+        tenant, workspace = await resolve_active_tenant(db, user, auto_provision=rt.auto_provision)
+        if tenant is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "no_membership")
+        await db.commit()
+        identity = await build_identity_for_user(db, user, tenant, workspace)
+
+    refresh = generate_refresh_token()
+    sess = await rt.session_store.create(
+        user_id=identity.user_id,
+        tenant_id=identity.tenant_id,
+        refresh_token=refresh,
+        ip=ip,
+        ua=_user_agent(request),
+    )
+    access_token = _issue_access_for(identity, sess.sid)
+
+    if ip:
+        await rt.lockout.clear(ip=ip, email=email)
+
+    response.set_cookie(
+        rt.cookie_name,
+        access_token,
+        httponly=True,
+        secure=rt.cookie_secure,
+        samesite="lax",
+        max_age=rt.access_ttl_sec,
+        path="/",
+    )
+    return {"status": "ok"}
+
+
+class SetPasswordIn(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/set-password")
+async def set_password(body: SetPasswordIn, request: Request):
+    """Set or update a user's password. Requires an authenticated platform_admin."""
+    from app.gateway.identity.auth.dependencies import require_authenticated
+    from app.gateway.identity.rbac.decorator import requires
+    identity = getattr(request.state, "identity", None)
+    if identity is None or not identity.is_authenticated:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
+    if "platform_admin" not in identity.roles.get("platform", []):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "platform_admin required")
+
+    email = body.email.strip().lower()
+    if len(body.password) < 8:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password must be at least 8 characters")
+
+    hashed = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+
+    rt = get_runtime()
+    async with rt.session_maker() as db:
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+        if user is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, f"user {email!r} not found")
+        user.password_hash = hashed
+        await db.commit()
+
     return {"status": "ok"}
 
 

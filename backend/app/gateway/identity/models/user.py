@@ -20,6 +20,7 @@ class User(Base):
     status: Mapped[int] = mapped_column(SmallInteger, server_default="1")
     oidc_subject: Mapped[str | None] = mapped_column(String(255))
     oidc_provider: Mapped[str | None] = mapped_column(String(64))
+    password_hash: Mapped[str | None] = mapped_column(Text)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_ip: Mapped[str | None] = mapped_column(INET)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
