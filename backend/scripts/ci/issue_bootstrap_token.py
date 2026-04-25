@@ -42,7 +42,7 @@ async def _mint() -> str:
     if settings.jwt_private_key:
         private_pem = settings.jwt_private_key
     else:
-        with open(settings.jwt_private_key_path) as f:
+        with open(settings.jwt_private_key_path, encoding="utf-8") as f:
             private_pem = f.read()
 
     engine, maker = create_engine_and_sessionmaker(settings.database_url)
