@@ -386,6 +386,7 @@ export interface Translations {
       workspaces: string;
       tokens: string;
       audit: string;
+      skills: string;
       profile: string;
     };
     pages: {
@@ -395,6 +396,7 @@ export interface Translations {
       workspacesTitle: string;
       tokensTitle: string;
       auditTitle: string;
+      skillsTitle: string;
       profileTitle: string;
     };
     actions: {
@@ -451,6 +453,39 @@ export interface Translations {
     };
     tenantSwitcher: {
       label: string;
+    };
+    table: {
+      colSlug: string;
+      colName: string;
+      colMembers: string;
+      colCreated: string;
+      colPlan: string;
+      colStatus: string;
+      colEmail: string;
+      colRoles: string;
+      colLastLogin: string;
+      colPrefix: string;
+      colScopes: string;
+      colLastUsed: string;
+      colRole: string;
+      colJoined: string;
+      colTimeUtc: string;
+      colActor: string;
+      colAction: string;
+      colResource: string;
+      colResult: string;
+      loading: string;
+      prev: string;
+      next: string;
+      statusActive: string;
+      statusDisabled: string;
+      statusRevoked: string;
+      details: string;
+      membersLink: string;
+      manageMembers: string;
+      backToWorkspaces: string;
+      backToTenants: string;
+      backToUsers: string;
     };
   };
 }

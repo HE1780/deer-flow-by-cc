@@ -86,18 +86,18 @@ function TenantsInner() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Slug</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Plan</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead>{t.admin.table.colSlug}</TableHead>
+            <TableHead>{t.admin.table.colName}</TableHead>
+            <TableHead>{t.admin.table.colPlan}</TableHead>
+            <TableHead>{t.admin.table.colStatus}</TableHead>
+            <TableHead>{t.admin.table.colCreated}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
@@ -108,20 +108,24 @@ function TenantsInner() {
               </TableCell>
             </TableRow>
           )}
-          {data?.items.map((t) => (
-            <TableRow key={t.id}>
+          {data?.items.map((tenant) => (
+            <TableRow key={tenant.id}>
               <TableCell>
                 <Link
-                  href={`/admin/tenants/${t.id}`}
+                  href={`/admin/tenants/${tenant.id}`}
                   className="underline"
                 >
-                  {t.slug}
+                  {tenant.slug}
                 </Link>
               </TableCell>
-              <TableCell>{t.name}</TableCell>
-              <TableCell>{t.plan}</TableCell>
-              <TableCell>{t.status === 1 ? "active" : "disabled"}</TableCell>
-              <TableCell>{t.created_at?.slice(0, 10) ?? "—"}</TableCell>
+              <TableCell>{tenant.name}</TableCell>
+              <TableCell>{tenant.plan}</TableCell>
+              <TableCell>
+                {tenant.status === 1
+                  ? t.admin.table.statusActive
+                  : t.admin.table.statusDisabled}
+              </TableCell>
+              <TableCell>{tenant.created_at?.slice(0, 10) ?? "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -139,7 +143,7 @@ function TenantsInner() {
             disabled={offset === 0}
             onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
           >
-            Prev
+            {t.admin.table.prev}
           </button>
           <button
             type="button"
@@ -147,7 +151,7 @@ function TenantsInner() {
             disabled={!data || offset + PAGE_SIZE >= data.total}
             onClick={() => setOffset(offset + PAGE_SIZE)}
           >
-            Next
+            {t.admin.table.next}
           </button>
         </div>
       </footer>
@@ -156,6 +160,7 @@ function TenantsInner() {
 }
 
 function CreateTenantDialog({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n();
   const create = useCreateTenant();
   const {
     register,
@@ -179,16 +184,15 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="tenants-create-dialog">
         <DialogHeader>
-          <DialogTitle>New tenant</DialogTitle>
+          <DialogTitle>{t.admin.forms.tenantCreateTitle}</DialogTitle>
           <DialogDescription>
-            Platform admins can create a new tenant. The slug is permanent —
-            choose carefully.
+            {t.admin.forms.tenantCreateDesc}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="tenant-slug">
-              Slug
+              {t.admin.forms.slugLabel}
             </label>
             <Input
               id="tenant-slug"
@@ -200,13 +204,13 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
               <p className="mt-1 text-xs text-destructive">{errors.slug.message}</p>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                2–64 chars, lowercase letters, digits, or dashes.
+                {t.admin.forms.slugHint}
               </p>
             )}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium" htmlFor="tenant-name">
-              Display name
+              {t.admin.forms.displayNameLabel}
             </label>
             <Input
               id="tenant-name"
@@ -230,14 +234,14 @@ function CreateTenantDialog({ onClose }: { onClose: () => void }) {
               onClick={onClose}
               data-testid="tenants-create-cancel"
             >
-              Cancel
+              {t.admin.actions.cancel}
             </Button>
             <Button
               type="submit"
               data-testid="tenants-create-submit"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : t.admin.actions.newTenant}
             </Button>
           </DialogFooter>
         </form>

@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/core/i18n/hooks";
 import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
@@ -46,13 +47,14 @@ export default function TenantDetailPage({ params }: Props) {
 
 function Inner({ id }: { id: number }) {
   const router = useRouter();
+  const { t } = useI18n();
   const { data, isLoading, isError } = useTenant(id);
   const [renameOpen, setRenameOpen] = useState(false);
   const canUpdate = useHasPermission("tenant:update");
   const canDelete = useHasPermission("tenant:delete");
   const remove = useDeleteTenant();
 
-  if (isLoading) return <p className="p-6 text-muted-foreground">Loading…</p>;
+  if (isLoading) return <p className="p-6 text-muted-foreground">{t.admin.table.loading}</p>;
   if (isError || !data)
     return <p className="p-6 text-destructive">Tenant not found.</p>;
 
@@ -63,7 +65,7 @@ function Inner({ id }: { id: number }) {
           href="/admin/tenants"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← Tenants
+          {t.admin.table.backToTenants}
         </Link>
         <div className="mt-1 flex items-center gap-2">
           <h1 className="text-xl font-semibold">{data.name}</h1>
@@ -74,12 +76,12 @@ function Inner({ id }: { id: number }) {
               data-testid="tenant-rename-btn"
               onClick={() => setRenameOpen(true)}
             >
-              Rename
+              {t.admin.actions.rename}
             </Button>
           )}
           {canDelete && (
             <InlineConfirm
-              label="Delete"
+              label={t.admin.actions.delete}
               onConfirm={async () => {
                 await remove.mutateAsync(data.id);
                 router.push("/admin/tenants");
@@ -96,23 +98,23 @@ function Inner({ id }: { id: number }) {
       </header>
       <dl className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt className="text-muted-foreground">Plan</dt>
+          <dt className="text-muted-foreground">{t.admin.table.colPlan}</dt>
           <dd>{data.plan}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Status</dt>
-          <dd>{data.status === 1 ? "active" : "disabled"}</dd>
+          <dt className="text-muted-foreground">{t.admin.table.colStatus}</dt>
+          <dd>{data.status === 1 ? t.admin.table.statusActive : t.admin.table.statusDisabled}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Workspaces</dt>
+          <dt className="text-muted-foreground">{t.admin.nav.workspaces}</dt>
           <dd>{data.workspace_count}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Members</dt>
+          <dt className="text-muted-foreground">{t.admin.table.colMembers}</dt>
           <dd>{data.member_count}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Created</dt>
+          <dt className="text-muted-foreground">{t.admin.table.colCreated}</dt>
           <dd>{data.created_at?.slice(0, 10) ?? "—"}</dd>
         </div>
       </dl>
@@ -136,6 +138,7 @@ function RenameTenantDialog({
   initialName: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const patch = useUpdateTenant(tenantId);
   const {
     register,
@@ -162,9 +165,9 @@ function RenameTenantDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="tenant-rename-dialog">
         <DialogHeader>
-          <DialogTitle>Rename tenant</DialogTitle>
+          <DialogTitle>{t.admin.forms.tenantRenameTitle}</DialogTitle>
           <DialogDescription>
-            The display name can be changed freely; the slug is permanent.
+            {t.admin.forms.tenantRenameDesc}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -187,14 +190,14 @@ function RenameTenantDialog({
               onClick={onClose}
               data-testid="tenant-rename-cancel"
             >
-              Cancel
+              {t.admin.actions.cancel}
             </Button>
             <Button
               type="submit"
               data-testid="tenant-rename-submit"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Saving…" : "Save"}
+              {isSubmitting ? "Saving…" : t.admin.actions.save}
             </Button>
           </DialogFooter>
         </form>

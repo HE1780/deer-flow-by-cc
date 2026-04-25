@@ -79,10 +79,10 @@ function Inner() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Slug</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Members</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead>{t.admin.table.colSlug}</TableHead>
+            <TableHead>{t.admin.table.colName}</TableHead>
+            <TableHead>{t.admin.table.colMembers}</TableHead>
+            <TableHead>{t.admin.table.colCreated}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -90,7 +90,7 @@ function Inner() {
           {isLoading && (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
@@ -105,13 +105,13 @@ function Inner() {
                   href={`/admin/workspaces/${w.id}`}
                   className="text-sm underline"
                 >
-                  Details →
+                  {t.admin.table.details}
                 </Link>
                 <Link
                   href={`/admin/workspaces/${w.id}/members`}
                   className="text-sm underline"
                 >
-                  Members →
+                  {t.admin.table.membersLink}
                 </Link>
               </TableCell>
             </TableRow>
@@ -125,7 +125,7 @@ function Inner() {
           disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         >
-          Prev
+          {t.admin.table.prev}
         </button>
         <button
           type="button"
@@ -133,7 +133,7 @@ function Inner() {
           disabled={!data || offset + PAGE_SIZE >= data.total}
           onClick={() => setOffset(offset + PAGE_SIZE)}
         >
-          Next
+          {t.admin.table.next}
         </button>
       </footer>
     </section>
@@ -147,6 +147,7 @@ function CreateWorkspaceDialog({
   tenantId: number;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const create = useCreateWorkspace(tenantId);
   const {
     register,
@@ -172,9 +173,9 @@ function CreateWorkspaceDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="workspaces-create-dialog">
         <DialogHeader>
-          <DialogTitle>New workspace</DialogTitle>
+          <DialogTitle>{t.admin.forms.workspaceCreateTitle}</DialogTitle>
           <DialogDescription>
-            The slug is scoped to the current tenant and permanent.
+            {t.admin.forms.workspaceCreateDesc}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -183,7 +184,7 @@ function CreateWorkspaceDialog({
               className="mb-1 block text-sm font-medium"
               htmlFor="workspace-slug"
             >
-              Slug
+              {t.admin.forms.slugLabel}
             </label>
             <Input
               id="workspace-slug"
@@ -199,7 +200,7 @@ function CreateWorkspaceDialog({
               className="mb-1 block text-sm font-medium"
               htmlFor="workspace-name"
             >
-              Display name
+              {t.admin.forms.displayNameLabel}
             </label>
             <Input
               id="workspace-name"
@@ -225,14 +226,14 @@ function CreateWorkspaceDialog({
               onClick={onClose}
               data-testid="workspaces-create-cancel"
             >
-              Cancel
+              {t.admin.actions.cancel}
             </Button>
             <Button
               type="submit"
               data-testid="workspaces-create-submit"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : t.admin.actions.newWorkspace}
             </Button>
           </DialogFooter>
         </form>

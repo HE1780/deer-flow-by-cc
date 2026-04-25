@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useI18n } from "@/core/i18n/hooks";
 import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import {
@@ -47,6 +48,7 @@ export default function WorkspaceDetailPage({ params }: Props) {
 
 function Inner({ wsId }: { wsId: number }) {
   const router = useRouter();
+  const { t } = useI18n();
   const { identity } = useIdentity();
   const tid = identity?.active_tenant_id ?? undefined;
   const { data, isLoading } = useWorkspaces(tid, { limit: 200 });
@@ -57,7 +59,7 @@ function Inner({ wsId }: { wsId: number }) {
   const canDelete = useHasPermission("workspace:delete");
   const remove = useDeleteWorkspace(tid);
 
-  if (isLoading) return <p className="p-6 text-muted-foreground">Loading…</p>;
+  if (isLoading) return <p className="p-6 text-muted-foreground">{t.admin.table.loading}</p>;
   if (!workspace)
     return <p className="p-6 text-destructive">Workspace not found.</p>;
 
@@ -68,7 +70,7 @@ function Inner({ wsId }: { wsId: number }) {
           href="/admin/workspaces"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← Workspaces
+          {t.admin.table.backToWorkspaces}
         </Link>
         <div className="mt-1 flex items-center gap-2">
           <h1 className="text-xl font-semibold">{workspace.name}</h1>
@@ -79,12 +81,12 @@ function Inner({ wsId }: { wsId: number }) {
               data-testid="workspace-rename-btn"
               onClick={() => setRenameOpen(true)}
             >
-              Rename
+              {t.admin.actions.rename}
             </Button>
           )}
           {canDelete && (
             <InlineConfirm
-              label="Delete"
+              label={t.admin.actions.delete}
               onConfirm={async () => {
                 await remove.mutateAsync(workspace.id);
                 router.push("/admin/workspaces");
@@ -101,11 +103,11 @@ function Inner({ wsId }: { wsId: number }) {
       </header>
       <dl className="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt className="text-muted-foreground">Members</dt>
+          <dt className="text-muted-foreground">{t.admin.table.colMembers}</dt>
           <dd>{workspace.member_count}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Created</dt>
+          <dt className="text-muted-foreground">{t.admin.table.colCreated}</dt>
           <dd>{workspace.created_at?.slice(0, 10) ?? "—"}</dd>
         </div>
         {workspace.description && (
@@ -120,7 +122,7 @@ function Inner({ wsId }: { wsId: number }) {
           href={`/admin/workspaces/${workspace.id}/members`}
           className="text-sm underline"
         >
-          Manage members →
+          {t.admin.table.manageMembers}
         </Link>
       </div>
       {renameOpen && tid && (
@@ -146,6 +148,7 @@ function RenameWorkspaceDialog({
   initialName: string;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const patch = useUpdateWorkspace(tenantId, wsId);
   const {
     register,
@@ -172,9 +175,9 @@ function RenameWorkspaceDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="workspace-rename-dialog">
         <DialogHeader>
-          <DialogTitle>Rename workspace</DialogTitle>
+          <DialogTitle>{t.admin.forms.workspaceRenameTitle}</DialogTitle>
           <DialogDescription>
-            The display name can be changed freely; the slug is permanent.
+            {t.admin.forms.workspaceRenameDesc}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -197,14 +200,14 @@ function RenameWorkspaceDialog({
               onClick={onClose}
               data-testid="workspace-rename-cancel"
             >
-              Cancel
+              {t.admin.actions.cancel}
             </Button>
             <Button
               type="submit"
               data-testid="workspace-rename-submit"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Saving…" : "Save"}
+              {isSubmitting ? "Saving…" : t.admin.actions.save}
             </Button>
           </DialogFooter>
         </form>

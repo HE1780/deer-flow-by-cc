@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useI18n } from "@/core/i18n/hooks";
 import { InlineConfirm } from "@/core/identity/components/InlineConfirm";
 import { PermBadge } from "@/core/identity/components/PermBadge";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
@@ -61,6 +62,7 @@ export default function WorkspaceMembersPage({ params }: Props) {
 }
 
 function Inner({ wsId }: { wsId: number }) {
+  const { t } = useI18n();
   const { identity } = useIdentity();
   const tid = identity?.active_tenant_id ?? undefined;
   const [offset, setOffset] = useState(0);
@@ -79,27 +81,27 @@ function Inner({ wsId }: { wsId: number }) {
         href="/admin/workspaces"
         className="text-sm text-muted-foreground hover:underline"
       >
-        ← Workspaces
+        {t.admin.table.backToWorkspaces}
       </Link>
       <header className="mt-1 mb-3 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Members</h1>
+        <h1 className="text-xl font-semibold">{t.admin.table.colMembers}</h1>
         {canInvite && (
           <Button
             size="sm"
             onClick={() => setAddOpen(true)}
             data-testid="member-add-btn"
           >
-            <PlusIcon className="size-4" /> Add member
+            <PlusIcon className="size-4" /> {t.admin.actions.addMember}
           </Button>
         )}
       </header>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Joined</TableHead>
+            <TableHead>{t.admin.table.colEmail}</TableHead>
+            <TableHead>{t.admin.table.colName}</TableHead>
+            <TableHead>{t.admin.table.colRole}</TableHead>
+            <TableHead>{t.admin.table.colJoined}</TableHead>
             {(canInvite || canRemove) && <TableHead aria-label="actions" />}
           </TableRow>
         </TableHeader>
@@ -107,7 +109,7 @@ function Inner({ wsId }: { wsId: number }) {
           {isLoading && (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
@@ -130,7 +132,7 @@ function Inner({ wsId }: { wsId: number }) {
           disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
         >
-          Prev
+          {t.admin.table.prev}
         </button>
         <button
           type="button"
@@ -138,7 +140,7 @@ function Inner({ wsId }: { wsId: number }) {
           disabled={!data || offset + PAGE_SIZE >= data.total}
           onClick={() => setOffset(offset + PAGE_SIZE)}
         >
-          Next
+          {t.admin.table.next}
         </button>
       </footer>
 
@@ -166,6 +168,7 @@ function MemberRow({
   canPatch: boolean;
   canRemove: boolean;
 }) {
+  const { t } = useI18n();
   const patch = usePatchWorkspaceMemberRole(tenantId, wsId);
   const remove = useRemoveWorkspaceMember(tenantId, wsId);
 
@@ -204,7 +207,7 @@ function MemberRow({
         <TableCell>
           {canRemove && (
             <InlineConfirm
-              label="Remove"
+              label={t.admin.actions.remove}
               onConfirm={() => remove.mutate(member.id)}
               pending={remove.isPending}
               triggerTestId={`member-remove-${member.id}`}
@@ -226,6 +229,7 @@ function AddMemberDialog({
   wsId: number;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [userIdRaw, setUserIdRaw] = useState("");
   const [role, setRole] = useState<RoleName>("member");
   const add = useAddWorkspaceMember(tenantId, wsId);
@@ -234,7 +238,7 @@ function AddMemberDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="member-add-dialog">
         <DialogHeader>
-          <DialogTitle>Add workspace member</DialogTitle>
+          <DialogTitle>{t.admin.actions.addMember}</DialogTitle>
           <DialogDescription>
             User must already be a tenant member. Enter their numeric user id —
             you can find it on the Users page.
@@ -257,7 +261,7 @@ function AddMemberDialog({
           }}
         >
           <label className="grid gap-1 text-sm">
-            <span>User id</span>
+            <span>{t.admin.audit.filterUserId}</span>
             <Input
               type="number"
               value={userIdRaw}
@@ -268,7 +272,7 @@ function AddMemberDialog({
             />
           </label>
           <label className="grid gap-1 text-sm">
-            <span>Role</span>
+            <span>{t.admin.table.colRole}</span>
             <Select
               value={role}
               onValueChange={(v) => setRole(v as RoleName)}
@@ -293,7 +297,7 @@ function AddMemberDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t.admin.actions.cancel}
               </Button>
             </DialogClose>
             <Button
@@ -301,7 +305,7 @@ function AddMemberDialog({
               disabled={add.isPending || !userIdRaw}
               data-testid="member-add-submit"
             >
-              {add.isPending ? "Adding…" : "Add"}
+              {add.isPending ? "Adding…" : t.admin.actions.addMember}
             </Button>
           </DialogFooter>
         </form>

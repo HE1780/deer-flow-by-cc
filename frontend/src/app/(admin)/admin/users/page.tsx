@@ -93,18 +93,18 @@ function Inner() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Roles</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last login</TableHead>
+            <TableHead>{t.admin.table.colEmail}</TableHead>
+            <TableHead>{t.admin.table.colName}</TableHead>
+            <TableHead>{t.admin.table.colRoles}</TableHead>
+            <TableHead>{t.admin.table.colStatus}</TableHead>
+            <TableHead>{t.admin.table.colLastLogin}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading && (
             <TableRow>
               <TableCell colSpan={5} className="text-muted-foreground">
-                Loading…
+                {t.admin.table.loading}
               </TableCell>
             </TableRow>
           )}
@@ -128,7 +128,11 @@ function Inner() {
                   <PermBadge key={r} perm={r} />
                 ))}
               </TableCell>
-              <TableCell>{u.status === 1 ? "active" : "disabled"}</TableCell>
+              <TableCell>
+                {u.status === 1
+                  ? t.admin.table.statusActive
+                  : t.admin.table.statusDisabled}
+              </TableCell>
               <TableCell>{u.last_login_at?.slice(0, 10) ?? "—"}</TableCell>
             </TableRow>
           ))}
@@ -143,7 +147,7 @@ function Inner() {
             disabled={offset === 0}
             onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
           >
-            Prev
+            {t.admin.table.prev}
           </button>
           <button
             type="button"
@@ -151,7 +155,7 @@ function Inner() {
             disabled={!data || offset + PAGE_SIZE >= data.total}
             onClick={() => setOffset(offset + PAGE_SIZE)}
           >
-            Next
+            {t.admin.table.next}
           </button>
         </div>
       </footer>
@@ -173,6 +177,7 @@ function CreateUserDialog({
   tenantId: number;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const create = useCreateUser(tenantId);
   const {
     register,
@@ -200,7 +205,7 @@ function CreateUserDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent data-testid="users-create-dialog">
         <DialogHeader>
-          <DialogTitle>Create user</DialogTitle>
+          <DialogTitle>{t.admin.actions.newUser}</DialogTitle>
           <DialogDescription>
             Adds the user to this tenant. They sign in via OIDC the first time
             and inherit the tenant&apos;s default workspace role.
@@ -208,7 +213,7 @@ function CreateUserDialog({
         </DialogHeader>
         <form className="grid gap-4" onSubmit={handleSubmit(onSubmit)}>
           <div className="grid gap-1 text-sm">
-            <label htmlFor="users-create-email">Email</label>
+            <label htmlFor="users-create-email">{t.admin.forms.emailLabel}</label>
             <Input
               id="users-create-email"
               type="email"
@@ -237,7 +242,7 @@ function CreateUserDialog({
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline">
-                Cancel
+                {t.admin.actions.cancel}
               </Button>
             </DialogClose>
             <Button
@@ -245,7 +250,7 @@ function CreateUserDialog({
               disabled={isSubmitting}
               data-testid="users-create-submit"
             >
-              {isSubmitting ? "Creating…" : "Create"}
+              {isSubmitting ? "Creating…" : t.admin.actions.newUser}
             </Button>
           </DialogFooter>
         </form>
