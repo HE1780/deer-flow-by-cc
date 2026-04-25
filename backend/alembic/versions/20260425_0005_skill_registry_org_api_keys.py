@@ -81,8 +81,15 @@ def upgrade() -> None:
         )
     """)
 
+    op.execute("""
+        CREATE UNIQUE INDEX uq_org_api_keys_active_prefix
+            ON identity.org_api_keys (prefix)
+            WHERE revoked_at IS NULL
+    """)
+
 
 def downgrade() -> None:
+    op.execute("DROP INDEX IF EXISTS identity.uq_org_api_keys_active_prefix")
     op.execute("DROP TABLE IF EXISTS identity.org_api_keys")
 
     op.execute("DROP INDEX IF EXISTS identity.skill_registry_default_private")
