@@ -2,6 +2,38 @@ import { getBackendBaseURL } from "@/core/config";
 
 import type { Skill } from "./type";
 
+export interface PublishSkillRequest {
+  manifest: string;
+  skill_md: string;
+}
+
+export interface PublishSkillResponse {
+  skill_id: number;
+  status: string;
+}
+
+export async function publishSkill(
+  request: PublishSkillRequest,
+): Promise<PublishSkillResponse> {
+  const response = await fetch(`${getBackendBaseURL()}/api/skills/publish`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage =
+      (errorData.detail as string | undefined) ??
+      `HTTP ${response.status}: ${response.statusText}`;
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
 export async function loadSkills() {
   const skills = await fetch(`${getBackendBaseURL()}/api/skills`);
   const json = await skills.json();
