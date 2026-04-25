@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import mimetypes
+import os
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -549,6 +550,29 @@ class ChannelManager:
         users_layer = _as_dict(channel_layer.get("users"))
         user_layer = _as_dict(users_layer.get(msg.user_id))
         return channel_layer, user_layer
+
+    def _resolve_channel_identity(self, msg: InboundMessage) -> tuple[int | None, int | None]:
+        """Read tenant/workspace IDs from channel config when the flag is on.
+
+        Returns ``(None, None)`` when ``ENABLE_IDENTITY`` is off, the config
+        omits both values, or the values aren't positive ints. The channel
+        layer wins over ``default_session`` — same merge semantics as
+        ``_resolve_session_layer``.
+        """
+        if os.environ.get("ENABLE_IDENTITY", "").strip().lower() not in {"1", "true", "yes", "on"}:
+            return None, None
+
+        channel_layer, _ = self._resolve_session_layer(msg)
+
+        def _pick(key: str) -> int | None:
+            value = channel_layer.get(key)
+            if value is None:
+                value = self._default_session.get(key)
+            if isinstance(value, bool) or not isinstance(value, int):
+                return None
+            return value if value > 0 else None
+
+        return _pick("tenant_id"), _pick("workspace_id")
 
     def _resolve_run_params(self, msg: InboundMessage, thread_id: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
         channel_layer, user_layer = self._resolve_session_layer(msg)

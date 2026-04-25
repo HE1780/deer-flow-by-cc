@@ -2470,3 +2470,87 @@ class TestSlackMarkdownConversion:
         result = _slack_md_converter.convert("# Title")
         assert "*Title*" in result
         assert "#" not in result
+
+
+# ---------------------------------------------------------------------------
+# ChannelManager identity-threading tests (M7A followup)
+# ---------------------------------------------------------------------------
+
+
+class TestChannelManagerIdentity:
+    def test_resolve_channel_identity_flag_off(self, monkeypatch):
+        """ENABLE_IDENTITY absent → helper returns (None, None) regardless of config."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.delenv("ENABLE_IDENTITY", raising=False)
+
+        bus = MessageBus()
+        store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+        manager = ChannelManager(
+            bus=bus,
+            store=store,
+            channel_sessions={"telegram": {"tenant_id": 7, "workspace_id": 3}},
+        )
+
+        msg = InboundMessage(channel_name="telegram", chat_id="c1", user_id="u1", text="hi")
+        tid, wid = manager._resolve_channel_identity(msg)
+        assert tid is None
+        assert wid is None
+
+    def test_resolve_channel_identity_flag_on_reads_channel_layer(self, monkeypatch):
+        """ENABLE_IDENTITY=1 + channel config → returns the configured pair."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setenv("ENABLE_IDENTITY", "1")
+
+        bus = MessageBus()
+        store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+        manager = ChannelManager(
+            bus=bus,
+            store=store,
+            channel_sessions={"telegram": {"tenant_id": 7, "workspace_id": 3}},
+        )
+
+        msg = InboundMessage(channel_name="telegram", chat_id="c1", user_id="u1", text="hi")
+        tid, wid = manager._resolve_channel_identity(msg)
+        assert tid == 7
+        assert wid == 3
+
+    def test_resolve_channel_identity_falls_back_to_default_session(self, monkeypatch):
+        """ENABLE_IDENTITY=1 + no per-channel values + default_session → uses default."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setenv("ENABLE_IDENTITY", "1")
+
+        bus = MessageBus()
+        store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+        manager = ChannelManager(
+            bus=bus,
+            store=store,
+            default_session={"tenant_id": 2, "workspace_id": 5},
+            channel_sessions={"telegram": {}},
+        )
+
+        msg = InboundMessage(channel_name="telegram", chat_id="c1", user_id="u1", text="hi")
+        tid, wid = manager._resolve_channel_identity(msg)
+        assert tid == 2
+        assert wid == 5
+
+    def test_resolve_channel_identity_rejects_non_int(self, monkeypatch):
+        """Non-int config values are treated as missing (defensive)."""
+        from app.channels.manager import ChannelManager
+
+        monkeypatch.setenv("ENABLE_IDENTITY", "1")
+
+        bus = MessageBus()
+        store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
+        manager = ChannelManager(
+            bus=bus,
+            store=store,
+            channel_sessions={"telegram": {"tenant_id": "seven", "workspace_id": None}},
+        )
+
+        msg = InboundMessage(channel_name="telegram", chat_id="c1", user_id="u1", text="hi")
+        tid, wid = manager._resolve_channel_identity(msg)
+        assert tid is None
+        assert wid is None
