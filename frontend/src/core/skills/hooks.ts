@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { enableSkill } from "./api";
 
 import { loadSkills } from ".";
+import {
+  bindSkillToThread,
+  fetchBoundSkills,
+  unbindSkillFromThread,
+  type BoundSkill,
+} from "./thread-api";
 
 export function useSkills() {
   const { data, isLoading, error } = useQuery({
@@ -26,6 +32,48 @@ export function useEnableSkill() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["skills"] });
+    },
+  });
+}
+
+export function useBoundSkills(threadId: string) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["threads", threadId, "skills"],
+    queryFn: () => fetchBoundSkills(threadId),
+    enabled: !!threadId,
+  });
+  return { boundSkills: data ?? [], isLoading };
+}
+
+export function useBindSkill(threadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      skillName,
+      version,
+    }: {
+      skillName: string;
+      version?: string;
+    }) => bindSkillToThread(threadId, skillName, version),
+    onSuccess: (data) => {
+      queryClient.setQueryData<BoundSkill[]>(
+        ["threads", threadId, "skills"],
+        data,
+      );
+    },
+  });
+}
+
+export function useUnbindSkill(threadId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (skillName: string) =>
+      unbindSkillFromThread(threadId, skillName),
+    onSuccess: (data) => {
+      queryClient.setQueryData<BoundSkill[]>(
+        ["threads", threadId, "skills"],
+        data,
+      );
     },
   });
 }
