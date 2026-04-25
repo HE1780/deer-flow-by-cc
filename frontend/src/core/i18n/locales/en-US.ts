@@ -466,6 +466,7 @@ export const enUS: Translations = {
       audit: "Audit log",
       skills: "Skills hub",
       profile: "Profile",
+      orgKeys: "Org Keys",
     },
     pages: {
       tenantsTitle: "Tenants",

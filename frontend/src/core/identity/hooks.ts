@@ -15,6 +15,7 @@ import {
   type AddWorkspaceMemberPayload,
   type AuditFilters,
   type CreateMyTokenPayload,
+  type CreateOrgKeyPayload,
   type CreateTenantPayload,
   type CreateTenantTokenPayload,
   type CreateUserPayload,
@@ -474,6 +475,39 @@ export function useUpdateMe() {
     mutationFn: (payload: UpdateMePayload) => identityApi.updateMe(payload),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: identityKeys.me() });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Task 5.1c: org-keys hooks
+// ---------------------------------------------------------------------------
+
+export function useOrgKeys() {
+  return useQuery({
+    queryKey: identityKeys.orgKeys(),
+    queryFn: () => identityApi.listOrgKeys(),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCreateOrgKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateOrgKeyPayload) =>
+      identityApi.createOrgKey(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: identityKeys.orgKeys() });
+    },
+  });
+}
+
+export function useRevokeOrgKey() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (keyId: number) => identityApi.revokeOrgKey(keyId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: identityKeys.orgKeys() });
     },
   });
 }

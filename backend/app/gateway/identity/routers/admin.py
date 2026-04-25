@@ -7,12 +7,17 @@ reads.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.gateway.identity.audit.events import AuditEvent
+from app.gateway.identity.auth.dependencies import require_authenticated
+from app.gateway.identity.auth.identity import Identity
 from app.gateway.identity.db import get_session
 from app.gateway.identity.models import (
     ApiToken,
@@ -25,6 +30,7 @@ from app.gateway.identity.models import (
     WorkspaceMember,
 )
 from app.gateway.identity.rbac.decorator import requires
+from app.gateway.identity.tasks.org_key_rotation import generate_org_key
 
 router = APIRouter(tags=["identity-admin"])
 
@@ -281,3 +287,198 @@ async def list_tenant_tokens(
         ],
         "total": int(total),
     }
+
+
+# ---------------------------------------------------------------------------
+# Org API key management (Task 5.1c)
+# ---------------------------------------------------------------------------
+
+_AUTO_ROTATE_INTERVAL_DAYS = 365  # permanent keys rotate annually
+
+
+class CreateOrgKeyIn(BaseModel):
+    name: str
+    no_expiry: bool = True
+    expires_in_days: int | None = None  # required when no_expiry=False; range 30-730
+    allowed_skills: list[str] = []
+
+
+def _org_key_row(row: Any, *, include_plaintext: str | None = None) -> dict:
+    out: dict = {
+        "id": row["id"],
+        "prefix": row["prefix"],
+        "name": row["name"],
+        "created_at": row["created_at"].isoformat() if row["created_at"] else None,
+        "expires_at": row["expires_at"].isoformat() if row["expires_at"] else None,
+        "no_expiry": row["no_expiry"],
+        "auto_rotate_at": row["auto_rotate_at"].isoformat() if row["auto_rotate_at"] else None,
+        "last_used_at": row["last_used_at"].isoformat() if row["last_used_at"] else None,
+        "revoked_at": row["revoked_at"].isoformat() if row["revoked_at"] else None,
+    }
+    if include_plaintext is not None:
+        out["plaintext"] = include_plaintext
+    return out
+
+
+@router.get(
+    "/api/admin/org-keys",
+    dependencies=[Depends(requires("membership:read", "platform"))],
+)
+async def list_org_keys(
+    request: Request,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """List all org API keys for the current tenant (requires membership:read)."""
+    if identity.tenant_id is None:
+        raise HTTPException(status_code=400, detail="no active tenant")
+    stmt = text(
+        """
+        SELECT id, tenant_id, name, prefix, no_expiry, allowed_skills,
+               expires_at, auto_rotate_at, last_rotated_at, last_used_at,
+               revoked_at, created_at
+        FROM identity.org_api_keys
+        WHERE tenant_id = :tenant_id
+        ORDER BY created_at DESC
+        """
+    )
+    result = await session.execute(stmt, {"tenant_id": identity.tenant_id})
+    rows = result.mappings().all()
+    return {"keys": [_org_key_row(r) for r in rows]}
+
+
+@router.post(
+    "/api/admin/org-keys",
+    dependencies=[Depends(requires("membership:read", "platform"))],
+    status_code=201,
+)
+async def create_org_key(
+    body: CreateOrgKeyIn,
+    request: Request,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Create a new org API key for the current tenant. Plaintext shown once."""
+    if identity.tenant_id is None:
+        raise HTTPException(status_code=400, detail="no active tenant")
+    if not body.no_expiry:
+        if body.expires_in_days is None or not (30 <= body.expires_in_days <= 730):
+            raise HTTPException(status_code=422, detail="expires_in_days must be between 30 and 730 when no_expiry=false")
+
+    plaintext, token_hash, prefix = generate_org_key()
+    now = datetime.now(UTC)
+
+    expires_at: datetime | None = None
+    auto_rotate_at: datetime | None = None
+    if body.no_expiry:
+        auto_rotate_at = now + timedelta(days=_AUTO_ROTATE_INTERVAL_DAYS)
+    else:
+        expires_at = now + timedelta(days=body.expires_in_days)  # type: ignore[arg-type]
+
+    insert_stmt = text(
+        """
+        INSERT INTO identity.org_api_keys
+            (tenant_id, name, prefix, token_hash, allowed_skills, no_expiry,
+             expires_at, auto_rotate_at, created_by, created_at)
+        VALUES
+            (:tenant_id, :name, :prefix, :token_hash, :allowed_skills::jsonb,
+             :no_expiry, :expires_at, :auto_rotate_at, :created_by, :now)
+        RETURNING id, name, prefix, no_expiry, expires_at, auto_rotate_at,
+                  last_used_at, revoked_at, created_at
+        """
+    )
+    import json
+
+    result = await session.execute(
+        insert_stmt,
+        {
+            "tenant_id": identity.tenant_id,
+            "name": body.name,
+            "prefix": prefix,
+            "token_hash": token_hash,
+            "allowed_skills": json.dumps(body.allowed_skills),
+            "no_expiry": body.no_expiry,
+            "expires_at": expires_at,
+            "auto_rotate_at": auto_rotate_at,
+            "created_by": identity.user_id,
+            "now": now,
+        },
+    )
+    row = result.mappings().one()
+    await session.commit()
+
+    # Emit audit event (best-effort)
+    writer = getattr(getattr(request.app, "state", None), "audit_writer", None)
+    if writer is not None:
+        try:
+            await writer.enqueue(
+                AuditEvent(
+                    action="org_key.created",
+                    result="success",
+                    tenant_id=identity.tenant_id,
+                    user_id=identity.user_id,
+                    resource_type="org_api_key",
+                    resource_id=str(row["id"]),
+                    metadata={"key_name": body.name, "prefix": prefix},
+                ),
+                critical=False,
+            )
+        except Exception:
+            pass
+
+    return _org_key_row(row, include_plaintext=plaintext)
+
+
+@router.delete(
+    "/api/admin/org-keys/{key_id}",
+    dependencies=[Depends(requires("membership:read", "platform"))],
+)
+async def revoke_org_key(
+    key_id: int,
+    request: Request,
+    identity: Identity = Depends(require_authenticated),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Revoke an org API key (set revoked_at = now())."""
+    if identity.tenant_id is None:
+        raise HTTPException(status_code=400, detail="no active tenant")
+    # Verify ownership by tenant
+    check_stmt = text(
+        "SELECT id, name, tenant_id, revoked_at FROM identity.org_api_keys WHERE id = :id"
+    )
+    result = await session.execute(check_stmt, {"id": key_id})
+    row = result.mappings().one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="org key not found")
+    if row["tenant_id"] != identity.tenant_id:
+        raise HTTPException(status_code=403, detail="cannot revoke key belonging to another tenant")
+    if row["revoked_at"] is not None:
+        raise HTTPException(status_code=409, detail="key already revoked")
+
+    now = datetime.now(UTC)
+    await session.execute(
+        text("UPDATE identity.org_api_keys SET revoked_at = :now WHERE id = :id"),
+        {"now": now, "id": key_id},
+    )
+    await session.commit()
+
+    # Emit audit event (best-effort)
+    writer = getattr(getattr(request.app, "state", None), "audit_writer", None)
+    if writer is not None:
+        try:
+            await writer.enqueue(
+                AuditEvent(
+                    action="org_key.revoked",
+                    result="success",
+                    tenant_id=identity.tenant_id,
+                    user_id=identity.user_id,
+                    resource_type="org_api_key",
+                    resource_id=str(key_id),
+                    metadata={"key_name": row["name"]},
+                ),
+                critical=False,
+            )
+        except Exception:
+            pass
+
+    return {"status": "revoked"}

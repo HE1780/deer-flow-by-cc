@@ -27,4 +27,5 @@ export const identityKeys = {
   audit: (tenantId: number, filters: string) =>
     [...identityKeys.all, "audit", tenantId, filters] as const,
   roles: () => [...identityKeys.all, "roles"] as const,
+  orgKeys: () => [...identityKeys.all, "org-keys"] as const,
 };

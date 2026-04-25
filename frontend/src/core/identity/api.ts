@@ -5,6 +5,7 @@ import {
   type AuditFilters,
   type AuditRow,
   type CreateMyTokenPayload,
+  type CreateOrgKeyPayload,
   type CreateTenantPayload,
   type CreateTenantTokenPayload,
   type CreateTokenResult,
@@ -15,6 +16,8 @@ import {
   type MySessionRow,
   type MyTokenRow,
   type OffsetListResponse,
+  type OrgKeyCreateResult,
+  type OrgKeysResponse,
   type PatchTenantPayload,
   type PatchWorkspaceMemberPayload,
   type PatchWorkspacePayload,
@@ -220,6 +223,18 @@ export const identityApi = {
   listMySessions: () => identityFetch<MySessionRow[]>("/api/me/sessions"),
   revokeMySession: (sid: string) =>
     identityFetch<{ status: string }>(`/api/me/sessions/${sid}`, {
+      method: "DELETE",
+    }),
+
+  // --- Task 5.1c: org-keys ---
+  listOrgKeys: () => identityFetch<OrgKeysResponse>("/api/admin/org-keys"),
+  createOrgKey: (payload: CreateOrgKeyPayload) =>
+    identityFetch<OrgKeyCreateResult>("/api/admin/org-keys", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  revokeOrgKey: (keyId: number) =>
+    identityFetch<{ status: string }>(`/api/admin/org-keys/${keyId}`, {
       method: "DELETE",
     }),
 };

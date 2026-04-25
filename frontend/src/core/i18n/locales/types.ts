@@ -388,6 +388,7 @@ export interface Translations {
       audit: string;
       skills: string;
       profile: string;
+      orgKeys: string;
     };
     pages: {
       tenantsTitle: string;

@@ -447,6 +447,7 @@ export const zhCN: Translations = {
       audit: "审计日志",
       skills: "技能中心",
       profile: "个人资料",
+      orgKeys: "Org Key",
     },
     pages: {
       tenantsTitle: "租户",

@@ -29,6 +29,7 @@ const ITEMS: Item[] = [
   },
   { href: "/admin/tokens", labelKey: "tokens", requires: "token:read" },
   { href: "/admin/audit", labelKey: "audit", requires: "audit:read" },
+  { href: "/admin/org-keys", labelKey: "orgKeys", requires: "membership:read" },
 ];
 
 export function AdminSidebar() {

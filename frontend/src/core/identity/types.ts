@@ -258,3 +258,34 @@ export interface UpdateMePayload {
   display_name?: string | null;
   avatar_url?: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Task 5.1c: Org API key management
+// ---------------------------------------------------------------------------
+
+export interface OrgKeyRow {
+  id: number;
+  prefix: string;
+  name: string;
+  created_at: string | null;
+  expires_at: string | null;
+  no_expiry: boolean;
+  auto_rotate_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface OrgKeyCreateResult extends OrgKeyRow {
+  plaintext: string; // shown ONCE — never re-served
+}
+
+export interface OrgKeysResponse {
+  keys: OrgKeyRow[];
+}
+
+export interface CreateOrgKeyPayload {
+  name: string;
+  no_expiry: boolean;
+  expires_in_days?: number | null;
+  allowed_skills?: string[];
+}
