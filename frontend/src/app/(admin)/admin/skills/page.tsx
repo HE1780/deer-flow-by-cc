@@ -55,6 +55,26 @@ async function rejectSkill(id: number, reason: string): Promise<void> {
   );
 }
 
+interface ReviewedSkill {
+  id: number;
+  name: string;
+  version: string;
+  scope: string;
+  status: string;
+  rejection_reason: string | null;
+  created_at: string | null;
+  created_by: number;
+  reviewed_at: string | null;
+  storage_path: string;
+}
+
+async function fetchReviewedSkills(): Promise<ReviewedSkill[]> {
+  const data = await identityFetch<{ skills: ReviewedSkill[] }>(
+    `${getBackendBaseURL()}/api/admin/skills/reviewed`,
+  );
+  return data.skills;
+}
+
 async function installSkillFile(file: File): Promise<void> {
   const form = new FormData();
   form.append("file", file);
@@ -218,7 +238,7 @@ function PendingSkillRow({
   );
 }
 
-function ArchivedSkillRow({ skill }: { skill: PendingSkill }) {
+function ArchivedSkillRow({ skill }: { skill: ReviewedSkill }) {
   const statusColour =
     skill.status === "rejected"
       ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
@@ -241,6 +261,11 @@ function ArchivedSkillRow({ skill }: { skill: PendingSkill }) {
           <p className="mt-1 text-xs text-muted-foreground">
             提交者: {skill.created_by} · {skill.created_at ? new Date(skill.created_at).toLocaleString("zh-CN") : "—"}
           </p>
+          {skill.rejection_reason && (
+            <p className="mt-1 text-xs text-destructive">
+              拒绝原因：{skill.rejection_reason}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -372,6 +397,16 @@ export default function SkillsHubPage() {
   } = useQuery({
     queryKey: ["admin", "skills", "pending"],
     queryFn: fetchPendingSkills,
+  });
+
+  // Reviewed (rejected/archived) skills query
+  const {
+    data: reviewedSkills = [],
+    isLoading: reviewedLoading,
+    error: reviewedError,
+  } = useQuery({
+    queryKey: ["admin", "skills", "reviewed"],
+    queryFn: fetchReviewedSkills,
   });
 
   // State for active-tab filters
@@ -533,16 +568,22 @@ export default function SkillsHubPage() {
         {/* Tab 3: Rejected / archived */}
         <TabsContent value="archived">
           <div className="mt-4 space-y-3">
-            {pendingLoading && (
+            {reviewedLoading && (
               <p className="text-sm text-muted-foreground">加载中…</p>
             )}
-            {/* We reuse the pending query data; rejected skills show from a
-                separate fetch of all skills. For now display a note that
-                rejected entries appear here once reviewed. */}
-            <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
-              <p>已拒绝或归档的 Skill 将在此显示。</p>
-              <p className="mt-1 text-xs">（需要单独的 API 端点列出已拒绝条目，当前仅展示待审批流程。）</p>
-            </div>
+            {reviewedError && (
+              <p className="text-sm text-destructive">
+                加载失败: {(reviewedError as Error).message}
+              </p>
+            )}
+            {!reviewedLoading && !reviewedError && reviewedSkills.length === 0 && (
+              <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground">
+                暂无已拒绝或归档的 Skill
+              </div>
+            )}
+            {reviewedSkills.map((skill) => (
+              <ArchivedSkillRow key={skill.id} skill={skill} />
+            ))}
           </div>
         </TabsContent>
       </Tabs>
