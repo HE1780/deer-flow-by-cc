@@ -668,6 +668,44 @@ async def reject_skill(
 
 
 @router.get(
+    "/api/admin/skills/reviewed",
+    dependencies=[Depends(requires("skill:manage", "platform"))],
+)
+async def list_reviewed_skills(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """List skills with status in ('rejected', 'archived')."""
+    stmt = text(
+        """
+        SELECT id, name, version, scope, status, rejection_reason,
+               created_at, created_by, reviewed_at, storage_path
+        FROM identity.skill_registry
+        WHERE status IN ('rejected', 'archived')
+        ORDER BY reviewed_at DESC NULLS LAST
+        """
+    )
+    result = await session.execute(stmt)
+    rows = result.mappings().all()
+    return {
+        "skills": [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "version": r["version"],
+                "scope": r["scope"],
+                "status": r["status"],
+                "rejection_reason": r["rejection_reason"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+                "created_by": r["created_by"],
+                "reviewed_at": r["reviewed_at"].isoformat() if r["reviewed_at"] else None,
+                "storage_path": r["storage_path"],
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get(
     "/api/skills/{skill_name}/review-status",
 )
 async def get_skill_review_status(
