@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -66,7 +67,7 @@ def main() -> None:
         r = client.post(
             f"{GATEWAY}/api/me/tokens",
             headers=jwt_headers,
-            json={"name": "ci-smoke", "scopes": ["thread:read", "thread:write"]},
+            json={"name": "ci-smoke", "scopes": ["thread:read", "thread:write", "audit:read"]},
         )
         if r.status_code not in (200, 201):
             _die("POST /api/me/tokens", r)
@@ -90,14 +91,21 @@ def main() -> None:
         tenant_id = me["active_tenant_id"]
         print(f"smoke: /api/me OK (tenant_id={tenant_id})")
 
-        # 4. Audit list - audit middleware should have logged the calls above.
-        r = client.get(f"{GATEWAY}/api/tenants/{tenant_id}/audit", headers=api_headers)
-        if r.status_code != 200:
-            _die(f"GET /api/tenants/{tenant_id}/audit", r)
-        audit = r.json()
-        items = audit.get("items", [])
+        # 4. Audit list - audit middleware enqueues async; AuditBatchWriter
+        # flushes every 1s, so we retry up to 10s for items to appear.
+        items: list = []
+        last_resp: httpx.Response | None = None
+        for _ in range(10):
+            r = client.get(f"{GATEWAY}/api/tenants/{tenant_id}/audit", headers=api_headers)
+            last_resp = r
+            if r.status_code != 200:
+                _die(f"GET /api/tenants/{tenant_id}/audit", r)
+            items = r.json().get("items", [])
+            if items:
+                break
+            time.sleep(1.0)
         if not items:
-            _die(f"audit items empty - middleware may not be firing: {audit!r}", r)
+            _die("audit items empty after 10s - middleware may not be firing", last_resp)
         print(f"smoke: /api/tenants/{tenant_id}/audit OK (items={len(items)})")
 
     print("smoke: all assertions passed")
