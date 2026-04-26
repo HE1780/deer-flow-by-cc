@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
@@ -47,14 +47,34 @@ export default function ChatPage() {
   const { mutate: bindSkill } = useBindSkill(threadId);
   const searchParams = useSearchParams();
 
-  // Auto-bind skill from URL param after thread is known (e.g. navigated from skills square)
-  useEffect(() => {
-    const skillName = searchParams.get("bind_skill");
-    const skillVersion = searchParams.get("bind_version") ?? "latest";
-    if (skillName && !isNewThread && threadId) {
-      bindSkill({ skillName, version: skillVersion });
+  // Capture bind_skill / bind_version from initial URL once and keep them in
+  // a ref. The chat page replaces its URL via history.replaceState() once a
+  // real thread is created (see onStart below) which strips query params, so
+  // reading searchParams later in the lifecycle would return null.
+  const pendingBindRef = useRef<{ name: string; version: string } | null>(null);
+  if (pendingBindRef.current === null) {
+    const initialSkill = searchParams.get("bind_skill");
+    if (initialSkill) {
+      pendingBindRef.current = {
+        name: initialSkill,
+        version: searchParams.get("bind_version") ?? "latest",
+      };
     }
-  }, [isNewThread, threadId, searchParams, bindSkill]);
+  }
+
+  // Auto-bind skill once the thread is real (post-first-message) and bind it
+  // exactly once per page visit.
+  const didBindRef = useRef(false);
+  useEffect(() => {
+    if (didBindRef.current) return;
+    if (!pendingBindRef.current) return;
+    if (isNewThread || !threadId) return;
+    bindSkill({
+      skillName: pendingBindRef.current.name,
+      version: pendingBindRef.current.version,
+    });
+    didBindRef.current = true;
+  }, [isNewThread, threadId, bindSkill]);
 
   useEffect(() => {
     setMounted(true);
