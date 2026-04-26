@@ -47,34 +47,45 @@ export default function ChatPage() {
   const { mutate: bindSkill } = useBindSkill(threadId);
   const searchParams = useSearchParams();
 
-  // Capture bind_skill / bind_version from initial URL once and keep them in
-  // a ref. The chat page replaces its URL via history.replaceState() once a
-  // real thread is created (see onStart below) which strips query params, so
-  // reading searchParams later in the lifecycle would return null.
-  const pendingBindRef = useRef<{ name: string; version: string } | null>(null);
-  if (pendingBindRef.current === null) {
-    const initialSkill = searchParams.get("bind_skill");
-    if (initialSkill) {
-      pendingBindRef.current = {
-        name: initialSkill,
-        version: searchParams.get("bind_version") ?? "latest",
-      };
-    }
-  }
+  // Capture bind_skill / bind_version from initial URL once. The chat page
+  // replaces its URL via history.replaceState() after the first message which
+  // strips query params, so we must capture these on initial render.
+  const [pendingBind, setPendingBind] = useState<{
+    name: string;
+    version: string;
+  } | null>(() => {
+    const skill = searchParams.get("bind_skill");
+    return skill
+      ? { name: skill, version: searchParams.get("bind_version") ?? "latest" }
+      : null;
+  });
 
-  // Auto-bind skill once the thread is real (post-first-message) and bind it
-  // exactly once per page visit.
+  // Auto-bind once the thread is real (post-first-message). Once the bind
+  // mutation fires, drop the pendingBind so the badge falls back to the
+  // server-confirmed boundSkills list.
   const didBindRef = useRef(false);
   useEffect(() => {
     if (didBindRef.current) return;
-    if (!pendingBindRef.current) return;
+    if (!pendingBind) return;
     if (isNewThread || !threadId) return;
-    bindSkill({
-      skillName: pendingBindRef.current.name,
-      version: pendingBindRef.current.version,
-    });
+    bindSkill(
+      { skillName: pendingBind.name, version: pendingBind.version },
+      { onSuccess: () => setPendingBind(null) },
+    );
     didBindRef.current = true;
-  }, [isNewThread, threadId, bindSkill]);
+  }, [isNewThread, threadId, bindSkill, pendingBind]);
+
+  // Optimistic badges shown before the server confirms the bind.
+  const optimisticBoundSkills =
+    pendingBind && boundSkills.length === 0
+      ? [
+          {
+            name: pendingBind.name,
+            version: pendingBind.version,
+            bound_at: "",
+          },
+        ]
+      : boundSkills;
 
   useEffect(() => {
     setMounted(true);
@@ -195,14 +206,22 @@ export default function ChatPage() {
                     }
                     context={settings.context}
                     extraHeader={
-                      isNewThread ? (
-                        <Welcome mode={settings.context.mode} />
-                      ) : boundSkills.length > 0 ? (
-                        <SkillBadgeBar
-                          threadId={threadId}
-                          boundSkills={boundSkills}
-                        />
-                      ) : undefined
+                      <>
+                        {isNewThread && (
+                          <Welcome mode={settings.context.mode} />
+                        )}
+                        {optimisticBoundSkills.length > 0 && (
+                          <SkillBadgeBar
+                            threadId={threadId}
+                            boundSkills={optimisticBoundSkills}
+                            onUnbind={
+                              pendingBind && boundSkills.length === 0
+                                ? () => setPendingBind(null)
+                                : undefined
+                            }
+                          />
+                        )}
+                      </>
                     }
                     disabled={
                       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||

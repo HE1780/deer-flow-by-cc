@@ -8,10 +8,19 @@ import type { BoundSkill } from "@/core/skills/thread-api";
 interface SkillBadgeBarProps {
   threadId: string;
   boundSkills: BoundSkill[];
+  // Optional override for the X click. Used while the thread is still
+  // pending (no real thread_id yet) so we just clear local state instead of
+  // calling the unbind API on a non-existent thread.
+  onUnbind?: (skillName: string) => void;
 }
 
-export function SkillBadgeBar({ threadId, boundSkills }: SkillBadgeBarProps) {
+export function SkillBadgeBar({
+  threadId,
+  boundSkills,
+  onUnbind,
+}: SkillBadgeBarProps) {
   const { mutate: unbind } = useUnbindSkill(threadId);
+  const handleUnbind = onUnbind ?? unbind;
 
   if (boundSkills.length === 0) return null;
 
@@ -25,7 +34,7 @@ export function SkillBadgeBar({ threadId, boundSkills }: SkillBadgeBarProps) {
           <SparklesIcon className="h-3 w-3" />
           /{skill.name}
           <button
-            onClick={() => unbind(skill.name)}
+            onClick={() => handleUnbind(skill.name)}
             className="hover:text-primary/60 ml-0.5 transition-colors"
             aria-label={`解绑 ${skill.name}`}
           >
