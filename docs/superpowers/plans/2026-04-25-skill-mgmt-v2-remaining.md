@@ -45,7 +45,7 @@ bound_skill 结构：
 {"name": str, "version": str, "bound_at": str}   # ISO timestamp
 ```
 
-- [ ] **Step 1: 创建 thread_skills.py**
+- [x] **Step 1: 创建 thread_skills.py**
 
 ```python
 # backend/app/gateway/routers/thread_skills.py
@@ -124,7 +124,7 @@ async def list_bound_skills(thread_id: str, request: Request) -> dict:
     return {"bound_skills": skills}
 ```
 
-- [ ] **Step 2: 检查 `get_store` 是否接受 Request**
+- [x] **Step 2: 检查 `get_store` 是否接受 Request**
 
 ```bash
 grep -n "get_store" /Users/lydoc/projectscoding/deer-flow/backend/app/gateway/deps.py | head -10
@@ -151,7 +151,7 @@ async def list_bound_skills(thread_id: str, store=Depends(_get_store_dep)) -> di
 
 并删除 `thread_skills.py` 中的 `request: Request` 参数。
 
-- [ ] **Step 3: 注册 router 到 app.py**
+- [x] **Step 3: 注册 router 到 app.py**
 
 在 `backend/app/gateway/app.py` 中，找到：
 ```python
@@ -167,7 +167,7 @@ from . import artifacts, assistants_compat, mcp, models, skills, suggestions, th
 app.include_router(thread_skills.router)
 ```
 
-- [ ] **Step 4: 启动后端，手动验证端点存在**
+- [x] **Step 4: 启动后端，手动验证端点存在**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/backend
@@ -180,7 +180,7 @@ python -c "from app.gateway.app import create_app; app = create_app(); routes = 
 /api/threads/{thread_id}/skills/{skill_name}
 ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/app/gateway/routers/thread_skills.py backend/app/gateway/app.py
@@ -194,7 +194,7 @@ git commit -m "feat(threads): add POST/DELETE/GET /api/threads/{tid}/skills bind
 **Files:**
 - Modify: `backend/app/gateway/identity/routers/admin.py`
 
-- [ ] **Step 1: 在 admin.py 现有 `reject_skill` 函数之后添加 `list_reviewed_skills` 端点**
+- [x] **Step 1: 在 admin.py 现有 `reject_skill` 函数之后添加 `list_reviewed_skills` 端点**
 
 定位文件末尾 `get_skill_review_status` 函数之前，插入：
 
@@ -237,7 +237,7 @@ async def list_reviewed_skills(
     }
 ```
 
-- [ ] **Step 2: 验证 admin router 能加载**
+- [x] **Step 2: 验证 admin router 能加载**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/backend
@@ -246,7 +246,7 @@ python -c "from app.gateway.identity.routers import admin; print('OK')"
 
 期望输出：`OK`
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add backend/app/gateway/identity/routers/admin.py
@@ -262,7 +262,7 @@ git commit -m "feat(admin): add GET /api/admin/skills/reviewed endpoint for reje
 - Modify: `frontend/src/core/skills/hooks.ts`
 - Modify: `frontend/src/core/skills/index.ts`
 
-- [ ] **Step 1: 创建 thread-api.ts**
+- [x] **Step 1: 创建 thread-api.ts**
 
 ```typescript
 // frontend/src/core/skills/thread-api.ts
@@ -323,7 +323,7 @@ export async function fetchBoundSkills(threadId: string): Promise<BoundSkill[]> 
 }
 ```
 
-- [ ] **Step 2: 在 hooks.ts 新增 useBoundSkills、useBindSkill、useUnbindSkill**
+- [x] **Step 2: 在 hooks.ts 新增 useBoundSkills、useBindSkill、useUnbindSkill**
 
 在 `frontend/src/core/skills/hooks.ts` 末尾追加：
 
@@ -373,7 +373,7 @@ export function useUnbindSkill(threadId: string) {
 }
 ```
 
-- [ ] **Step 3: 在 index.ts 导出新模块**
+- [x] **Step 3: 在 index.ts 导出新模块**
 
 将 `frontend/src/core/skills/index.ts` 改为：
 ```typescript
@@ -382,7 +382,7 @@ export * from "./type";
 export * from "./thread-api";
 ```
 
-- [ ] **Step 4: TypeScript 类型检查**
+- [x] **Step 4: TypeScript 类型检查**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -391,7 +391,7 @@ npx tsc --noEmit 2>&1 | grep -E "error TS|skills" | head -20
 
 期望：无 error。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/core/skills/thread-api.ts frontend/src/core/skills/hooks.ts frontend/src/core/skills/index.ts
@@ -407,7 +407,7 @@ git commit -m "feat(skills): add thread-skill bind/unbind API and React Query ho
 
 这个组件显示在会话输入框上方，展示已绑定技能，每个 badge 有 × 按钮。
 
-- [ ] **Step 1: 创建 skill-badge-bar.tsx**
+- [x] **Step 1: 创建 skill-badge-bar.tsx**
 
 ```tsx
 // frontend/src/components/workspace/skill-badge-bar.tsx
@@ -451,7 +451,7 @@ export function SkillBadgeBar({ threadId, boundSkills }: SkillBadgeBarProps) {
 }
 ```
 
-- [ ] **Step 2: TypeScript 类型检查**
+- [x] **Step 2: TypeScript 类型检查**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -460,7 +460,7 @@ npx tsc --noEmit 2>&1 | grep -E "error TS|skill-badge" | head -10
 
 期望：无 error。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add frontend/src/components/workspace/skill-badge-bar.tsx
@@ -474,7 +474,7 @@ git commit -m "feat(workspace): add SkillBadgeBar component for bound skills dis
 **Files:**
 - Modify: `frontend/src/app/workspace/chats/[thread_id]/page.tsx`
 
-- [ ] **Step 1: 导入新 hooks 和组件**
+- [x] **Step 1: 导入新 hooks 和组件**
 
 在 `frontend/src/app/workspace/chats/[thread_id]/page.tsx` 顶部导入区，在现有 imports 后添加：
 
@@ -483,7 +483,7 @@ import { SkillBadgeBar } from "@/components/workspace/skill-badge-bar";
 import { useBoundSkills } from "@/core/skills/hooks";
 ```
 
-- [ ] **Step 2: 调用 useBoundSkills**
+- [x] **Step 2: 调用 useBoundSkills**
 
 在组件函数内，在 `const [settings, setSettings] = useThreadSettings(threadId);` 之后添加：
 
@@ -491,7 +491,7 @@ import { useBoundSkills } from "@/core/skills/hooks";
 const { boundSkills } = useBoundSkills(threadId);
 ```
 
-- [ ] **Step 3: 在 InputBox 的 extraHeader 中渲染 SkillBadgeBar**
+- [x] **Step 3: 在 InputBox 的 extraHeader 中渲染 SkillBadgeBar**
 
 将现有的：
 ```typescript
@@ -510,7 +510,7 @@ extraHeader={
 }
 ```
 
-- [ ] **Step 4: TypeScript 类型检查**
+- [x] **Step 4: TypeScript 类型检查**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -519,7 +519,7 @@ npx tsc --noEmit 2>&1 | grep "error TS" | head -10
 
 期望：无 error。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add frontend/src/app/workspace/chats/\[thread_id\]/page.tsx
@@ -539,7 +539,7 @@ git commit -m "feat(workspace): integrate SkillBadgeBar into thread chat page"
 
 **策略：简化版（YAGNI）** — 因为技能广场是独立页面而非会话内的弹窗，最简单的设计是：用户点击"加载到会话"时跳转到 `/workspace/chats/new?bind_skill=<name>&bind_version=<version>`，chat 页检测该 param 并在 thread 创建后绑定。这避免跨页面状态管理。
 
-- [ ] **Step 1: 修改 SkillCard 的 handleLoad，改为跳转**
+- [x] **Step 1: 修改 SkillCard 的 handleLoad，改为跳转**
 
 在 `frontend/src/app/workspace/skills/page.tsx` 中，在文件顶部 imports 添加：
 
@@ -565,7 +565,7 @@ function SkillCard({ skill }: { skill: Skill }) {
 }
 ```
 
-- [ ] **Step 2: 在 thread chat 页检测 bind_skill param 并绑定**
+- [x] **Step 2: 在 thread chat 页检测 bind_skill param 并绑定**
 
 在 `frontend/src/app/workspace/chats/[thread_id]/page.tsx` 中，在 `useSearchParams` 相关代码附近（或在 useEffect 区域）添加：
 
@@ -595,7 +595,7 @@ Also add `useBindSkill` to the hooks import:
 import { useBoundSkills, useBindSkill } from "@/core/skills/hooks";
 ```
 
-- [ ] **Step 3: TypeScript 类型检查**
+- [x] **Step 3: TypeScript 类型检查**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -604,7 +604,7 @@ npx tsc --noEmit 2>&1 | grep "error TS" | head -10
 
 期望：无 error。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add frontend/src/app/workspace/skills/page.tsx frontend/src/app/workspace/chats/\[thread_id\]/page.tsx
@@ -618,7 +618,7 @@ git commit -m "feat(skills): wire 'load to chat' button — navigate with bind_s
 **Files:**
 - Modify: `frontend/src/app/(admin)/admin/skills/page.tsx`
 
-- [ ] **Step 1: 添加 ReviewedSkill 接口和 fetchReviewedSkills 函数**
+- [x] **Step 1: 添加 ReviewedSkill 接口和 fetchReviewedSkills 函数**
 
 在 `frontend/src/app/(admin)/admin/skills/page.tsx` 中，在已有的 `PendingSkill` interface 和 `fetchPendingSkills` 之后添加：
 
@@ -644,7 +644,7 @@ async function fetchReviewedSkills(): Promise<ReviewedSkill[]> {
 }
 ```
 
-- [ ] **Step 2: 在 SkillsHubPage 组件中添加 useQuery for reviewed skills**
+- [x] **Step 2: 在 SkillsHubPage 组件中添加 useQuery for reviewed skills**
 
 在 `pendingSkills` useQuery 之后添加：
 
@@ -659,7 +659,7 @@ const {
 });
 ```
 
-- [ ] **Step 3: 替换 archived tab 内容为真实数据**
+- [x] **Step 3: 替换 archived tab 内容为真实数据**
 
 将现有的 `TabsContent value="archived"` 里的占位内容全部替换为：
 
@@ -686,7 +686,7 @@ const {
 </TabsContent>
 ```
 
-- [ ] **Step 4: 在 ArchivedSkillRow 中显示拒绝原因**
+- [x] **Step 4: 在 ArchivedSkillRow 中显示拒绝原因**
 
 将现有的 `ArchivedSkillRow` 组件中 `<p className="mt-1 text-xs text-muted-foreground">` 那行改为：
 
@@ -707,7 +707,7 @@ const {
 function ArchivedSkillRow({ skill }: { skill: ReviewedSkill }) {
 ```
 
-- [ ] **Step 5: TypeScript 类型检查**
+- [x] **Step 5: TypeScript 类型检查**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -716,7 +716,7 @@ npx tsc --noEmit 2>&1 | grep "error TS" | head -10
 
 期望：无 error。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add frontend/src/app/\(admin\)/admin/skills/page.tsx
@@ -730,7 +730,7 @@ git commit -m "feat(admin): wire rejected/archived skills tab to GET /api/admin/
 **Files:**
 - Create: `frontend/tests/unit/core/skills/thread-skills.test.ts`
 
-- [ ] **Step 1: 创建测试文件**
+- [x] **Step 1: 创建测试文件**
 
 ```typescript
 // frontend/tests/unit/core/skills/thread-skills.test.ts
@@ -808,7 +808,7 @@ describe("fetchBoundSkills", () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试，确认通过**
+- [x] **Step 2: 运行测试，确认通过**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -821,7 +821,7 @@ Test Files  1 passed (1)
      Tests  4 passed (4)
 ```
 
-- [ ] **Step 3: 运行所有 unit 测试，确认无回归**
+- [x] **Step 3: 运行所有 unit 测试，确认无回归**
 
 ```bash
 cd /Users/lydoc/projectscoding/deer-flow/frontend
@@ -830,7 +830,7 @@ npx vitest run --passWithNoTests
 
 期望：全部通过，之前的 38 个测试保持 pass。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add frontend/tests/unit/core/skills/thread-skills.test.ts

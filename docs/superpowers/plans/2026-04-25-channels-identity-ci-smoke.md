@@ -1,5 +1,10 @@
 # Channels Identity TODO + CI E2E Identity Smoke — Implementation Plan
 
+> **实施状态（2026-04-27 复核）：** ✅ 全部已落地。
+> - Part 1 (channels identity): commits `ab59a037` (ChannelStore 持久化 tenant/workspace) + `e385586a` (`_resolve_channel_identity` 辅助) + `85266c69` (`resolve_virtual_path` 串通) — `backend/app/channels/store.py:88-141` `manager.py:573-736`，测试类 `TestChannelManagerIdentity` 已添加 (`backend/tests/test_channels.py:2480`)。
+> - Part 2 (CI smoke): `backend/scripts/ci/issue_bootstrap_token.py` + `identity_smoke_test.py` + `.github/workflows/identity-e2e-smoke.yml` 全部已创建。
+> - 文件原计划用任务级 `### Step` 标题而非 `- [ ]` checkbox，所以无需勾选；以本横幅记录实施状态即可。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Thread tenant/workspace identity through the IM channels pipeline (Part 1) and add a CI workflow that proves `ENABLE_IDENTITY=true` Gateway boots, authenticates, and audits end-to-end (Part 2).

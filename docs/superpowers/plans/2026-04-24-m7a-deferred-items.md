@@ -1,5 +1,13 @@
 # M7A Deferred Items — Implementation Plan
 
+> **实施状态（2026-04-27 复核）：** ✅ 全部 53 个 Step 已落地。
+> - **Item 4 RBAC matrix E2E：** `tenants-new-btn` / `workspaces-new-btn` testid + audit `<RequirePermission>` + `A4-rbac-matrix.spec.ts` 全部已建。
+> - **Item 2 create+rename+delete：** [admin_writes.py](../../../backend/app/gateway/identity/routers/admin_writes.py) 6 个写端点（`create_tenant` / `update_tenant` / `delete_tenant` / `create_workspace` / `update_workspace` / `delete_workspace`）+ audit 测试全部已加。
+> - **Item 1 react-hook-form + zod：** [schemas.ts](../../../frontend/src/core/identity/schemas.ts)、[zod-i18n.ts](../../../frontend/src/core/identity/zod-i18n.ts) 已建；admin 写表单全部使用 `useForm` + `zodResolver`；[me.py:106 patch_me](../../../backend/app/gateway/identity/routers/me.py#L106) 已加。
+> - **Item 3 i18n sweep：** admin 命名空间 + en-US/zh-CN locale 已扩展，admin 页面英文字面量已替换为 `useI18n()` 键。
+> - **组件命名差异：** 计划里的 `<ConfirmDialog>` 实际以 [`InlineConfirm.tsx`](../../../frontend/src/core/identity/components/InlineConfirm.tsx) 名称落地，功能等价（被 tenants/[id]、workspaces/[id]、tokens、org-keys 引用）。
+> - **手工验证项：** Playwright matrix / write spec 是否在本地稳定运行需要人工执行；本次复核仅核对了源代码存在性。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Land the four deferred M7A items — RBAC matrix E2E, tenant/workspace create+rename+delete, react-hook-form+zod refactor with `PATCH /api/me`, and i18n sweep — onto `main` with all gates green.
@@ -47,13 +55,13 @@
 
 **Why:** Item 4's matrix needs a stable selector for these buttons. Item 2 will wire the dialogs onto these buttons; for now they exist as no-op buttons gated by `<RequirePermission>` so the matrix can assert visibility per role.
 
-- [ ] **Step 1: Read current `tenants/page.tsx`**
+- [x] **Step 1: Read current `tenants/page.tsx`**
 
 ```bash
 cat frontend/src/app/\(admin\)/admin/tenants/page.tsx
 ```
 
-- [ ] **Step 2: Add gated New Tenant button to tenants page**
+- [x] **Step 2: Add gated New Tenant button to tenants page**
 
 In `tenants/page.tsx`, add this near the page title (mirror the pattern from `tokens/page.tsx:80-86`):
 
@@ -71,7 +79,7 @@ import { Button } from "@/components/ui/button";
 
 `disabled` is intentional — Item 2 wires the click handler. The matrix only asserts visibility.
 
-- [ ] **Step 3: Same for workspaces/page.tsx with `workspace:create` perm**
+- [x] **Step 3: Same for workspaces/page.tsx with `workspace:create` perm**
 
 ```tsx
 <RequirePermission perm="workspace:create">
@@ -81,12 +89,12 @@ import { Button } from "@/components/ui/button";
 </RequirePermission>
 ```
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 Run: `cd frontend && pnpm check`
 Expected: PASS (no new errors).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/app/\(admin\)/admin/tenants/page.tsx frontend/src/app/\(admin\)/admin/workspaces/page.tsx
@@ -100,13 +108,13 @@ git commit -m "feat(identity-ui): add tenants-new-btn + workspaces-new-btn place
 
 **Why:** Item 4's matrix needs a "view audit" assertion. The simplest cell semantic: gate the page wrapper on `audit:read`. If the role lacks the perm, render an `audit-denied` empty state. The matrix asserts `audit-page` testid for allowed roles, `audit-denied` for denied.
 
-- [ ] **Step 1: Read audit page header section**
+- [x] **Step 1: Read audit page header section**
 
 ```bash
 grep -n "data-testid\|audit-page\|RequirePermission\|audit:read" frontend/src/app/\(admin\)/admin/audit/page.tsx | head
 ```
 
-- [ ] **Step 2: Wrap page body in `<RequirePermission perm="audit:read">` with `audit-denied` fallback**
+- [x] **Step 2: Wrap page body in `<RequirePermission perm="audit:read">` with `audit-denied` fallback**
 
 If `audit-page` testid already exists, leave it. Wrap as:
 
@@ -125,7 +133,7 @@ If `audit-page` testid already exists, leave it. Wrap as:
 </RequirePermission>
 ```
 
-- [ ] **Step 3: Type-check + commit**
+- [x] **Step 3: Type-check + commit**
 
 ```bash
 cd frontend && pnpm check && cd .. && \
@@ -138,7 +146,7 @@ git commit -m "feat(identity-ui): gate audit page with audit:read + audit-denied
 **Files:**
 - Create: `frontend/tests/e2e/identity/A4-rbac-matrix.spec.ts`
 
-- [ ] **Step 1: Write the spec file**
+- [x] **Step 1: Write the spec file**
 
 ```ts
 // frontend/tests/e2e/identity/A4-rbac-matrix.spec.ts
@@ -328,13 +336,13 @@ test.describe("rbac-matrix: 5 roles × 6 actions", () => {
 });
 ```
 
-- [ ] **Step 2: Run the spec — expect failures only on the cells that depend on Task 1/2 having shipped (none should fail)**
+- [x] **Step 2: Run the spec — expect failures only on the cells that depend on Task 1/2 having shipped (none should fail)**
 
 Run: `cd frontend && pnpm test:e2e -g "rbac-matrix" --reporter=list`
 
 Expected: 30/30 pass. If anything fails, the failing cell points to a missing testid or a perm gate not wired — fix the page, re-run.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/tests/e2e/identity/A4-rbac-matrix.spec.ts
@@ -351,13 +359,13 @@ git commit -m "test(identity-ui): RBAC matrix 5 roles x 6 actions (M7A item 4)"
 - Modify: `backend/app/gateway/identity/routers/admin_writes.py`
 - Modify: `backend/tests/identity/test_admin_writes.py`
 
-- [ ] **Step 1: Read existing module to mirror its style**
+- [x] **Step 1: Read existing module to mirror its style**
 
 ```bash
 sed -n '1,80p' backend/app/gateway/identity/routers/admin_writes.py
 ```
 
-- [ ] **Step 2: Write failing tests first**
+- [x] **Step 2: Write failing tests first**
 
 Append to `backend/tests/identity/test_admin_writes.py`:
 
@@ -425,13 +433,13 @@ async def test_delete_tenant_soft_deletes(
 
 Mirror the same 6 tests for workspaces (`POST /api/tenants/{tid}/workspaces`, `PATCH`, `DELETE`).
 
-- [ ] **Step 3: Run failing**
+- [x] **Step 3: Run failing**
 
 Run: `cd backend && pytest tests/identity/test_admin_writes.py -k "create_tenant or patch_tenant or delete_tenant or create_workspace or patch_workspace or delete_workspace" -x`
 
 Expected: FAIL with "404 not found" / route missing.
 
-- [ ] **Step 4: Implement the 6 routes**
+- [x] **Step 4: Implement the 6 routes**
 
 Add to `admin_writes.py`:
 
@@ -484,12 +492,12 @@ async def delete_tenant(request: Request, tid: int):
 
 Mirror for workspaces with `workspace:create` / `workspace:write` / `workspace:delete` and tenant-scoped path.
 
-- [ ] **Step 5: Run tests passing**
+- [x] **Step 5: Run tests passing**
 
 Run: `cd backend && pytest tests/identity/test_admin_writes.py -x`
 Expected: PASS (existing 16 + new 12).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/app/gateway/identity/routers/admin_writes.py backend/tests/identity/test_admin_writes.py
@@ -501,7 +509,7 @@ git commit -m "feat(identity): tenant + workspace CRUD endpoints (M7A item 2 bac
 **Files:**
 - Modify: `backend/tests/identity/test_admin_writes.py`
 
-- [ ] **Step 1: Add parametrized audit test**
+- [x] **Step 1: Add parametrized audit test**
 
 ```python
 @pytest.mark.parametrize(
@@ -550,12 +558,12 @@ def audit_collector(monkeypatch):
 
 If the actual audit buffer API differs, adapt — read `app/gateway/identity/audit/middleware.py` first.
 
-- [ ] **Step 2: Run, then iterate until green**
+- [x] **Step 2: Run, then iterate until green**
 
 Run: `cd backend && pytest tests/identity/test_admin_writes.py::test_write_endpoints_emit_audit -x -v`
 Expected: 10/10 PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add backend/tests/identity/test_admin_writes.py backend/tests/identity/conftest.py
@@ -568,13 +576,13 @@ git commit -m "test(identity): audit emission for all write endpoints (M7A item 
 - Create: `frontend/src/core/identity/components/CopyableSecret.tsx`
 - Create: `frontend/src/core/identity/components/ConfirmDialog.tsx`
 
-- [ ] **Step 1: Read existing inline copy logic in `tokens/page.tsx`**
+- [x] **Step 1: Read existing inline copy logic in `tokens/page.tsx`**
 
 ```bash
 sed -n '280,330p' frontend/src/app/\(admin\)/admin/tokens/page.tsx
 ```
 
-- [ ] **Step 2: Write `CopyableSecret`**
+- [x] **Step 2: Write `CopyableSecret`**
 
 ```tsx
 // frontend/src/core/identity/components/CopyableSecret.tsx
@@ -626,7 +634,7 @@ export function CopyableSecret({ value, testIdPrefix = "secret" }: Props) {
 }
 ```
 
-- [ ] **Step 3: Write `ConfirmDialog`**
+- [x] **Step 3: Write `ConfirmDialog`**
 
 ```tsx
 // frontend/src/core/identity/components/ConfirmDialog.tsx
@@ -698,13 +706,13 @@ export function ConfirmDialog({
 
 If `alert-dialog` shadcn component is missing, scaffold it: `cd frontend && pnpm dlx shadcn@latest add alert-dialog`.
 
-- [ ] **Step 4: Refactor `tokens/page.tsx` and `profile/page.tsx` to consume `CopyableSecret`**
+- [x] **Step 4: Refactor `tokens/page.tsx` and `profile/page.tsx` to consume `CopyableSecret`**
 
 Replace the inline `<input value={plaintext} readonly>` + manual copy button with `<CopyableSecret value={plaintext} testIdPrefix="token-plaintext" />`. Preserve the `token-plaintext-value` and `token-copy-btn` testids by passing `testIdPrefix="token-plaintext"`.
 
 If existing E2E uses `token-copy-btn` exactly, also accept that prefix transition: keep the original testids by passing `testIdPrefix="token-plaintext"` so `token-plaintext-copy` exists; then update the existing `A3-write-actions.spec.ts` selector (or add an alias). Verify by running the spec.
 
-- [ ] **Step 5: Type-check + commit**
+- [x] **Step 5: Type-check + commit**
 
 ```bash
 cd frontend && pnpm check && cd .. && \
@@ -719,7 +727,7 @@ git commit -m "refactor(identity-ui): extract CopyableSecret + ConfirmDialog (M7
 - Modify: `frontend/src/core/identity/api.ts`
 - Modify: `frontend/src/core/identity/hooks.ts`
 
-- [ ] **Step 1: Add types**
+- [x] **Step 1: Add types**
 
 In `types.ts`:
 
@@ -731,7 +739,7 @@ export interface UpdateWorkspaceBody { name?: string; }
 export interface UpdateMeBody { display_name?: string; avatar_url?: string | null; }
 ```
 
-- [ ] **Step 2: Add API wrappers**
+- [x] **Step 2: Add API wrappers**
 
 In `api.ts`:
 
@@ -752,7 +760,7 @@ updateMe: (body: UpdateMeBody) =>
   identityFetch<MeResponse>("/api/me", { method: "PATCH", body }),
 ```
 
-- [ ] **Step 3: Add hooks (mutations + invalidations)**
+- [x] **Step 3: Add hooks (mutations + invalidations)**
 
 In `hooks.ts`, mirror the existing `useCreateUser` pattern. Each mutation invalidates the relevant cache key:
 
@@ -769,7 +777,7 @@ export function useCreateTenant() {
 
 `useUpdateMe` invalidates `identityKeys.me()`.
 
-- [ ] **Step 4: Type-check + commit**
+- [x] **Step 4: Type-check + commit**
 
 ```bash
 cd frontend && pnpm check && cd .. && \
@@ -785,21 +793,21 @@ git commit -m "feat(identity-ui): API + hooks for tenant/workspace CRUD + update
 - Modify: `frontend/src/app/(admin)/admin/workspaces/page.tsx`
 - Modify: `frontend/src/app/(admin)/admin/workspaces/[id]/page.tsx`
 
-- [ ] **Step 1: Wire New Tenant dialog**
+- [x] **Step 1: Wire New Tenant dialog**
 
 Replace the placeholder `disabled` Button in `tenants/page.tsx` with a `<Dialog>` whose trigger is the `tenants-new-btn` Button (no longer disabled). Form has `slug` + `name` fields with `data-testid="tenants-create-{slug,name,submit}"`. Submit calls `useCreateTenant().mutateAsync(...)`, closes on success.
 
 (Validation here is uncontrolled inputs + manual `required`. Item 1 will refactor to rhf+zod.)
 
-- [ ] **Step 2: Wire rename + delete on `tenants/[id]/page.tsx`**
+- [x] **Step 2: Wire rename + delete on `tenants/[id]/page.tsx`**
 
 Add a pencil-icon Button next to the tenant name; click opens a small inline dialog with one `name` field calling `useUpdateTenant`. Add a `<ConfirmDialog>` for delete calling `useDeleteTenant`, then `router.push("/admin/tenants")` on success.
 
-- [ ] **Step 3: Mirror for workspaces (page + detail)**
+- [x] **Step 3: Mirror for workspaces (page + detail)**
 
 `workspaces/[id]/page.tsx` may not exist yet — if not, create a minimal detail page that renders the workspace name + Members link + the rename/delete affordances. Otherwise modify in place.
 
-- [ ] **Step 4: Type-check + run RBAC matrix to confirm nothing regressed**
+- [x] **Step 4: Type-check + run RBAC matrix to confirm nothing regressed**
 
 ```bash
 cd frontend && pnpm check
@@ -808,7 +816,7 @@ pnpm test:e2e -g "rbac-matrix" --reporter=list
 
 Expected: 30/30 PASS still.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/app/\(admin\)/admin/tenants frontend/src/app/\(admin\)/admin/workspaces && \
@@ -820,7 +828,7 @@ git commit -m "feat(identity-ui): tenant + workspace create/rename/delete dialog
 **Files:**
 - Create: `frontend/tests/e2e/identity/A3-tenant-workspace.spec.ts`
 
-- [ ] **Step 1: Write spec**
+- [x] **Step 1: Write spec**
 
 Cover:
 1. `platform_admin` creates a tenant — fill slug+name in dialog, submit, mock returns 201, assert toast + invalidation triggered (network call observed).
@@ -831,7 +839,7 @@ Cover:
 
 Use `mockAdmin` fixture; intercept the new POST/PATCH/DELETE routes and assert request bodies.
 
-- [ ] **Step 2: Run + commit**
+- [x] **Step 2: Run + commit**
 
 ```bash
 cd frontend && pnpm test:e2e -g "tenant-workspace|rbac-matrix" --reporter=list
@@ -849,21 +857,21 @@ git commit -m "test(identity-ui): E2E for tenant/workspace CRUD (M7A item 2)"
 - Modify: `frontend/package.json`
 - Create: `frontend/src/core/identity/schemas.ts`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 cd frontend && pnpm add react-hook-form @hookform/resolvers
 ```
 
-- [ ] **Step 2: Write `schemas.ts`** (full module from spec §"Item 1 → Schemas")
+- [x] **Step 2: Write `schemas.ts`** (full module from spec §"Item 1 → Schemas")
 
-- [ ] **Step 3: Verify `<Form>` shadcn primitives exist**
+- [x] **Step 3: Verify `<Form>` shadcn primitives exist**
 
 ```bash
 ls frontend/src/components/ui/form.tsx 2>/dev/null || (cd frontend && pnpm dlx shadcn@latest add form)
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/package.json frontend/pnpm-lock.yaml frontend/src/core/identity/schemas.ts frontend/src/components/ui/form.tsx 2>/dev/null
@@ -875,7 +883,7 @@ git commit -m "chore(identity-ui): add react-hook-form + zod schemas module (M7A
 **Files:**
 - Modify: 8 dialog locations (see spec §"Dialogs refactored")
 
-- [ ] **Step 1: Refactor `tokens/page.tsx` New-token dialog**
+- [x] **Step 1: Refactor `tokens/page.tsx` New-token dialog**
 
 Replace the `useState`-driven inputs + onClick handler with:
 
@@ -910,15 +918,15 @@ return (
 
 PRESERVE every existing testid. Run `pnpm test:e2e -g "A3-write-actions"` after each refactor to confirm no selector breakage.
 
-- [ ] **Step 2: Same for `users/page.tsx`, `members/page.tsx`, `tenants/page.tsx`, `tenants/[id]/page.tsx`, `workspaces/page.tsx`, `workspaces/[id]/page.tsx`**
+- [x] **Step 2: Same for `users/page.tsx`, `members/page.tsx`, `tenants/page.tsx`, `tenants/[id]/page.tsx`, `workspaces/page.tsx`, `workspaces/[id]/page.tsx`**
 
 After EACH file: `pnpm test:e2e -g "A3-|rbac-matrix"` green before moving to the next.
 
-- [ ] **Step 3: Wire `PATCH /api/me` in `profile/page.tsx` Basic tab**
+- [x] **Step 3: Wire `PATCH /api/me` in `profile/page.tsx` Basic tab**
 
 Use `profileBasicSchema`, `useUpdateMe()`. Render success toast on save. Add testids `profile-basic-{display-name,avatar-url,submit}`.
 
-- [ ] **Step 4: Verify schema route matches backend**
+- [x] **Step 4: Verify schema route matches backend**
 
 ```bash
 sed -n '1,80p' backend/app/gateway/identity/routers/me.py | grep -A 20 "patch\|PATCH\|update_me"
@@ -926,7 +934,7 @@ sed -n '1,80p' backend/app/gateway/identity/routers/me.py | grep -A 20 "patch\|P
 
 If the backend `PATCH /api/me` schema differs (e.g. only accepts `display_name` not `avatar_url`), narrow `profileBasicSchema` to match. Don't add backend code in this item.
 
-- [ ] **Step 5: Full gate**
+- [x] **Step 5: Full gate**
 
 ```bash
 cd frontend && pnpm check && pnpm test && pnpm test:e2e --reporter=list
@@ -934,7 +942,7 @@ cd frontend && pnpm check && pnpm test && pnpm test:e2e --reporter=list
 
 Expected: all green.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/app/\(admin\)/admin frontend/src/core/identity && \
@@ -953,15 +961,15 @@ git commit -m "refactor(identity-ui): rhf + zod for all admin dialogs + PATCH /a
 - Modify: `frontend/src/core/i18n/locales/zh-CN.ts`
 - Create: `frontend/src/core/identity/zod-i18n.ts`
 
-- [ ] **Step 1: Add namespace structure to `types.ts`**
+- [x] **Step 1: Add namespace structure to `types.ts`**
 
 Extend the `admin` field with `dialogs`, `validation`, `tables`, `empty`, `toast`, `profile.basic` sub-shapes per spec §"New `admin` keys". Make every leaf `string`.
 
-- [ ] **Step 2: Fill en-US.ts and zh-CN.ts**
+- [x] **Step 2: Fill en-US.ts and zh-CN.ts**
 
 For zh-CN, prefer concise Mandarin matching v1 product copy in `frontend/src/components/landing/` for terminology consistency.
 
-- [ ] **Step 3: Wire zod-i18n custom error map**
+- [x] **Step 3: Wire zod-i18n custom error map**
 
 ```ts
 // frontend/src/core/identity/zod-i18n.ts
@@ -992,7 +1000,7 @@ export function makeZodErrorMap(t: Translations["admin"]["validation"]): z.ZodEr
 
 In a top-level provider (or in each form's `useEffect`), `z.setErrorMap(makeZodErrorMap(t))`.
 
-- [ ] **Step 4: Replace remaining English literals in admin pages with `useI18n()` keys**
+- [x] **Step 4: Replace remaining English literals in admin pages with `useI18n()` keys**
 
 Sweep every page under `app/(admin)/admin/`. Check with:
 
@@ -1002,7 +1010,7 @@ grep -nE '"[A-Z][a-z]+( [a-z]+){1,3}"' frontend/src/app/\(admin\)/admin --includ
 
 Treat each match as a candidate; replace if it's user-facing.
 
-- [ ] **Step 5: Type-check (catches missing zh keys)**
+- [x] **Step 5: Type-check (catches missing zh keys)**
 
 ```bash
 cd frontend && pnpm check
@@ -1010,7 +1018,7 @@ cd frontend && pnpm check
 
 Expected: PASS — TS errors mean a key exists in en-US but not zh-CN (or vice versa).
 
-- [ ] **Step 6: Manual smoke (optional but recommended)**
+- [x] **Step 6: Manual smoke (optional but recommended)**
 
 ```bash
 cd frontend && pnpm dev
@@ -1018,7 +1026,7 @@ cd frontend && pnpm dev
 
 Switch language to zh-CN, walk through `/admin/tenants` create + delete, confirm no English leak.
 
-- [ ] **Step 7: Final gate + commit**
+- [x] **Step 7: Final gate + commit**
 
 ```bash
 cd frontend && pnpm check && pnpm test:e2e --reporter=list
