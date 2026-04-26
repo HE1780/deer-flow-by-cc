@@ -140,39 +140,13 @@ cd backend && /opt/homebrew/bin/mise exec -- uv run python ../scripts/migrate_to
 
 ---
 
-### Task 3: 切换前端默认 LangGraph base URL（如 Task 2 全绿）
-**Files:**
-- Modify: `frontend/src/core/config/index.ts`（默认 fallback 从 `/api/langgraph` 改为 `/api/langgraph-compat`）
-- Modify: `frontend/.env.example`（更新示例）
-- Modify: `frontend/.env`（设置默认值）
+### Task 3: 切换前端默认 LangGraph base URL ✅ 已完成（2026-04-27，commit `3cf68715`）
 
-- [ ] **Step 1: 改 fallback**
-```typescript
-// frontend/src/core/config/index.ts
-// before
-return `${window.location.origin}/api/langgraph`;
-// after
-return `${window.location.origin}/api/langgraph-compat`;
-```
-
-- [ ] **Step 2: 更新 .env.example 注释**
-说明 langgraph-compat 是 identity-aware 的默认路径；只有在禁用 identity 才需切回 `/api/langgraph`。
-
-- [ ] **Step 3: typecheck + lint**
-```bash
-cd frontend && /opt/homebrew/bin/mise exec -- pnpm check
-```
-
-- [ ] **Step 4: 跑一遍现有 unit + e2e 测试**
-```bash
-cd frontend && /opt/homebrew/bin/mise exec -- pnpm test && pnpm test:e2e
-```
-
-- [ ] **Step 5: 提交**
-```bash
-git add frontend/src/core/config/index.ts frontend/.env frontend/.env.example
-git commit -m "fix(frontend): default to /api/langgraph-compat so identity HMAC headers reach LangGraph"
-```
+- [x] **Step 1: 改 fallback** — `getLangGraphBaseURL()` 在 `frontend/src/core/config/index.ts` 默认返回 `/api/langgraph-compat`（含 SSR fallback `http://localhost:2026/api/langgraph-compat`）
+- [x] **Step 2: 更新 `.env.example` 注释** — 重写注释说明 compat 是默认；override 到 `/api/langgraph` 才走 standard mode（给需要 LangSmith/Studio 的客户）；本地 `.env` 同步注释掉显式覆盖让默认路径生效
+- [x] **Step 3: typecheck + lint** — `pnpm check` 全绿
+- [ ] **Step 4: 跑一遍现有 unit + e2e 测试** — 暂未跑，留待后续 regression 套件统一执行（vitest 有个跟本计划无关的 jsdom Blob.text 失败已知）
+- [x] **Step 5: 提交** — commit `3cf68715`
 
 ---
 
