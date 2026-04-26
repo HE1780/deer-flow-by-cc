@@ -23,7 +23,7 @@ export function SkillBadgeBar({ threadId, boundSkills }: SkillBadgeBarProps) {
           className="bg-primary/10 text-primary flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
         >
           <SparklesIcon className="h-3 w-3" />
-          {skill.name}
+          /{skill.name}
           <button
             onClick={() => unbind(skill.name)}
             className="hover:text-primary/60 ml-0.5 transition-colors"
