@@ -25,7 +25,7 @@ export function SkillBadgeBar({
   if (boundSkills.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5">
+    <div className="flex flex-wrap items-center justify-center gap-1.5 px-3 pb-2">
       {boundSkills.map((skill) => (
         <span
           key={skill.name}

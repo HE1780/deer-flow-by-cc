@@ -206,7 +206,7 @@ export default function ChatPage() {
                     }
                     context={settings.context}
                     extraHeader={
-                      <>
+                      <div className="flex flex-col gap-3">
                         {isNewThread && (
                           <Welcome mode={settings.context.mode} />
                         )}
@@ -221,7 +221,7 @@ export default function ChatPage() {
                             }
                           />
                         )}
-                      </>
+                      </div>
                     }
                     disabled={
                       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
