@@ -1,9 +1,12 @@
 # Identity 路径脱节修复 — 前端 LangGraph 直连绕过 Gateway HMAC 注入
 
-> **执行状态（2026-04-27 更新）：**
-> - ✅ Task 1 已执行：备份、dry-run、apply、冲突处理、symlink 验证全部完成
-> - ⏳ Task 2-5 待执行；当前阻塞"本地 SaaS 模式跑通"的唯一事项
-> - **修复方向已定**：langgraph-compat 切换是必经之路（自托管定位下少一个 LangGraph 进程更合理；身份注入边界统一在 Gateway 更易审计），不再讨论选项 B/C
+> **执行状态（2026-04-27，最终更新）：✅ 已闭环**
+> - ✅ Task 1: 历史数据迁移（58 thread + 1 skill_user，留 forwarder symlink）
+> - ✅ Task 2: smoke 测试通过 — 命令行（HMAC 注入、stratified 写盘、流式输出）+ 浏览器（artifact / 上传可见 / agent_name / chat 流式 / 登录 / admin / skill 绑定）双轨
+> - ✅ Task 3: 前端默认 fallback 切到 `/api/langgraph-compat`（commit `3cf68715`）
+> - ⏳ Task 4 (nginx profile 化) + Task 5 (CI 防回归) 推迟到自托管 epic 一起做（不阻塞主线）
+>
+> **沿途修复的 langgraph-compat experimental gap：** ISO timestamp 兼容（commit `24e07817`）— Gateway threads API 之前返回 unix-seconds 字符串，前端 date-fns 崩；修后兼容历史 unix-string 记录
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
