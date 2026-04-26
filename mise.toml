@@ -1,0 +1,12 @@
+[tools]
+python = "3.12"
+node = "22"
+uv = "latest"
+pnpm = "10.26.2"
+
+[env]
+UV_PYTHON_DOWNLOADS = "never"
+UV_PYTHON_PREFERENCE = "only-system"
+
+[settings]
+experimental = true
