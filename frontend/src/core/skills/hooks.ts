@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { enableSkill } from "./api";
-
-import { loadSkills } from ".";
 import {
   bindSkillToThread,
   fetchBoundSkills,
   unbindSkillFromThread,
   type BoundSkill,
 } from "./thread-api";
+
+import { loadSkills } from ".";
 
 export function useSkills() {
   const { data, isLoading, error } = useQuery({

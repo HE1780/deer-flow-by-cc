@@ -1,6 +1,7 @@
 // frontend/src/app/(admin)/admin/skills/page.tsx
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircleIcon,
   PackagePlusIcon,
@@ -12,8 +13,6 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getBackendBaseURL } from "@/core/config";
@@ -482,7 +481,7 @@ export default function SkillsHubPage() {
             )}
             {pendingError && (
               <p className="text-sm text-destructive">
-                加载失败: {(pendingError as Error).message}
+                加载失败: {pendingError.message}
               </p>
             )}
             {!pendingLoading && !pendingError && pendingSkills.length === 0 && (
@@ -573,7 +572,7 @@ export default function SkillsHubPage() {
             )}
             {reviewedError && (
               <p className="text-sm text-destructive">
-                加载失败: {(reviewedError as Error).message}
+                加载失败: {reviewedError.message}
               </p>
             )}
             {!reviewedLoading && !reviewedError && reviewedSkills.length === 0 && (

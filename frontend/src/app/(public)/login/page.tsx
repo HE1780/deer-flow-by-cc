@@ -1,9 +1,9 @@
 // frontend/src/app/(public)/login/page.tsx
 "use client";
 
-import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
+import React from "react";
 
 import { identityApi } from "@/core/identity/api";
 import { identityKeys } from "@/core/identity/query-keys";

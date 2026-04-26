@@ -11,6 +11,7 @@ import {
   Settings2Icon,
   SettingsIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -68,10 +69,11 @@ export function WorkspaceNavMenu() {
   const { t } = useI18n();
   const { identity } = useIdentity();
 
-  const isAdmin =
-    identity?.roles?.platform?.includes("platform_admin") ||
-    identity?.roles?.tenant?.includes("tenant_owner") ||
-    false;
+  const isPlatformAdmin =
+    identity?.roles?.platform?.includes("platform_admin") === true;
+  const isTenantOwner =
+    identity?.roles?.tenant?.includes("tenant_owner") === true;
+  const isAdmin = isPlatformAdmin || isTenantOwner;
 
   useEffect(() => {
     setMounted(true);
@@ -115,12 +117,12 @@ export function WorkspaceNavMenu() {
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
-                      <a href="/admin/tenants">
+                      <Link href="/admin/tenants">
                         <DropdownMenuItem>
                           <LayoutDashboardIcon />
                           Admin Portal
                         </DropdownMenuItem>
-                      </a>
+                      </Link>
                     </>
                   )}
 
