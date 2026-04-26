@@ -30,7 +30,7 @@ Use this when reviewing the Memory Settings add/edit flow locally with the fewes
 
    Default local URLs:
    - App: `http://localhost:2026`
-   - Local frontend-only fallback: `http://localhost:3000`
+   - Local frontend-only fallback: `http://localhost:3110`
 
 ## Minimal Manual Test
 

@@ -22,7 +22,7 @@ from app.channels.store import ChannelStore
 logger = logging.getLogger(__name__)
 
 DEFAULT_LANGGRAPH_URL = "http://localhost:2024"
-DEFAULT_GATEWAY_URL = "http://localhost:8001"
+DEFAULT_GATEWAY_URL = "http://localhost:8100"
 DEFAULT_ASSISTANT_ID = "lead_agent"
 CUSTOM_AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 

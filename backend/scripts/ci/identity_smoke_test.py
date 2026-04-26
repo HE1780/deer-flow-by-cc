@@ -21,7 +21,7 @@ from pathlib import Path
 
 import httpx
 
-GATEWAY = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8001")
+GATEWAY = os.environ.get("GATEWAY_URL", "http://127.0.0.1:8100")
 TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 

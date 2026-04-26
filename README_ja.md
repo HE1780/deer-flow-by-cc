@@ -250,8 +250,8 @@ DeerFlowはメッセージングアプリからのタスク受信をサポート
 channels:
   # LangGraphサーバーURL（デフォルト: http://localhost:2024）
   langgraph_url: http://localhost:2024
-  # Gateway API URL（デフォルト: http://localhost:8001）
-  gateway_url: http://localhost:8001
+  # Gateway API URL（デフォルト: http://localhost:8100）
+  gateway_url: http://localhost:8100
 
   # オプション: 全モバイルチャネルのグローバルセッションデフォルト
   session:

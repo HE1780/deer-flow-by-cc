@@ -15,7 +15,7 @@ DeerFlow is a LangGraph-based AI super agent with sandbox execution, persistent 
               /api/langgraph/*  │                  │  /api/* (other)
                                 ▼                  ▼
                ┌────────────────────┐  ┌────────────────────────┐
-               │ LangGraph Server   │  │   Gateway API (8001)   │
+               │ LangGraph Server   │  │   Gateway API (8100)   │
                │    (Port 2024)     │  │   FastAPI REST         │
                │                    │  │                        │
                │ ┌────────────────┐ │  │ Models, MCP, Skills,   │
@@ -208,7 +208,7 @@ make dev
 make gateway
 ```
 
-Direct access: LangGraph at http://localhost:2024, Gateway at http://localhost:8001
+Direct access: LangGraph at http://localhost:2024, Gateway at http://localhost:8100
 
 ---
 
@@ -363,7 +363,7 @@ If a provider is explicitly enabled but required credentials are missing, or the
 ```bash
 make install    # Install dependencies
 make dev        # Run LangGraph server (port 2024)
-make gateway    # Run Gateway API (port 8001)
+make gateway    # Run Gateway API (port 8100)
 make lint       # Run linter (ruff)
 make format     # Format code (ruff)
 ```

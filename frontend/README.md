@@ -32,7 +32,7 @@ cp .env.example .env
 # Start development server
 pnpm dev
 
-# The app will be available at http://localhost:3000
+# The app will be available at http://localhost:3110
 ```
 
 ### Build & Test
@@ -104,7 +104,7 @@ Key environment variables (see `.env.example` for full list):
 
 ```bash
 # Backend API URLs (optional, uses nginx proxy by default)
-NEXT_PUBLIC_BACKEND_BASE_URL="http://localhost:8001"
+NEXT_PUBLIC_BACKEND_BASE_URL="http://localhost:8100"
 # LangGraph API URLs (optional, uses nginx proxy by default)
 NEXT_PUBLIC_LANGGRAPH_BASE_URL="http://localhost:2024"
 ```

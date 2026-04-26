@@ -28,7 +28,7 @@ export function getLangGraphBaseURL(isMock?: boolean) {
     if (typeof window !== "undefined") {
       return `${window.location.origin}/mock/api`;
     }
-    return "http://localhost:3000/mock/api";
+    return "http://localhost:3110/mock/api";
   } else {
     // LangGraph SDK requires a full URL, construct it from current origin
     if (typeof window !== "undefined") {

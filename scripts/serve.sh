@@ -89,8 +89,8 @@ stop_all() {
     pkill -9 nginx 2>/dev/null || true
     # Force-kill any survivors still holding the service ports
     _kill_port 2024
-    _kill_port 8001
-    _kill_port 3000
+    _kill_port 8100
+    _kill_port 3110
     ./scripts/cleanup-containers.sh deer-flow-sandbox 2>/dev/null || true
     echo "✓ All services stopped"
 }
@@ -224,8 +224,8 @@ echo "  Services:"
 if ! $GATEWAY_MODE; then
     echo "    LangGraph   → localhost:2024  (agent runtime)"
 fi
-echo "    Gateway     → localhost:8001  (REST API$(if $GATEWAY_MODE; then echo " + agent runtime"; fi))"
-echo "    Frontend    → localhost:3000  (Next.js)"
+echo "    Gateway     → localhost:8100  (REST API$(if $GATEWAY_MODE; then echo " + agent runtime"; fi))"
+echo "    Frontend    → localhost:3110  (Next.js)"
 echo "    Nginx       → localhost:2026  (reverse proxy)"
 echo ""
 
@@ -287,13 +287,13 @@ fi
 
 # 2. Gateway API
 run_service "Gateway" \
-    "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1" \
-    8001 30
+    "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8100 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1" \
+    8100 30
 
 # 3. Frontend
 run_service "Frontend" \
-    "cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
-    3000 120
+    "cd frontend && PORT=3110 $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
+    3110 120
 
 # 4. Nginx
 run_service "Nginx" \
@@ -316,7 +316,7 @@ else
     echo "  Routing: Frontend → Nginx → LangGraph + Gateway"
     echo "  API:     /api/langgraph/*  →  LangGraph server (2024)"
 fi
-echo "           /api/*              →  Gateway REST API (8001)"
+echo "           /api/*              →  Gateway REST API (8100)"
 echo ""
 echo "  📋 Logs: logs/{langgraph,gateway,frontend,nginx}.log"
 echo ""

@@ -303,6 +303,24 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
    make check  # Verifies Node.js 22+, pnpm, uv, nginx
    ```
 
+   <details>
+   <summary>Using <a href="https://mise.jdx.dev/">mise</a> to manage tool versions (recommended)</summary>
+
+   The repo ships a [`mise.toml`](./mise.toml) that pins Python, Node, uv, and pnpm to the versions this project expects. If you have mise installed:
+
+   ```bash
+   mise install   # one-shot install of all four tools at the right versions
+   mise current   # verify
+   ```
+
+   `nginx` is **not** managed by mise (the mise plugins for nginx are unstable). Install it separately, e.g. `brew install nginx` on macOS or `apt install nginx` on Debian/Ubuntu.
+
+   Notes:
+   - `UV_PYTHON_DOWNLOADS=never` and `UV_PYTHON_PREFERENCE=only-system` are set in `mise.toml` so `uv` reuses the mise-provided Python instead of downloading its own copy.
+   - `packageManager` in `frontend/package.json` pins pnpm to `10.26.2`; mise installs the same version, so Corepack and `pnpm install` stay in sync.
+
+   </details>
+
 2. **Install dependencies**:
    ```bash
    make install  # Install backend + frontend dependencies
@@ -418,8 +436,8 @@ DeerFlow supports receiving tasks from messaging apps. Channels auto-start when 
 channels:
   # LangGraph Server URL (default: http://localhost:2024)
   langgraph_url: http://localhost:2024
-  # Gateway API URL (default: http://localhost:8001)
-  gateway_url: http://localhost:8001
+  # Gateway API URL (default: http://localhost:8100)
+  gateway_url: http://localhost:8100
 
   # Optional: global session defaults for all mobile channels
   session:

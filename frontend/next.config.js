@@ -4,11 +4,28 @@
  */
 import "./src/env.js";
 
+/**
+ * Resolve internal upstream URL from env with a deterministic fallback.
+ */
 function getInternalServiceURL(envKey, fallbackURL) {
   const configured = process.env[envKey]?.trim();
   return configured && configured.length > 0
     ? configured.replace(/\/+$/, "")
     : fallbackURL;
+}
+
+/**
+ * Resolve required internal upstream URL from env and fail fast if missing.
+ */
+function getRequiredInternalServiceURL(envKey) {
+  const configured = process.env[envKey]?.trim();
+  if (!configured) {
+    throw new Error(
+      `Missing required environment variable: ${envKey}. ` +
+        "Set it in your .env before starting frontend.",
+    );
+  }
+  return configured.replace(/\/+$/, "");
 }
 import nextra from "nextra";
 
@@ -27,9 +44,8 @@ const config = {
       "DEER_FLOW_INTERNAL_LANGGRAPH_BASE_URL",
       "http://127.0.0.1:2024",
     );
-    const gatewayURL = getInternalServiceURL(
+    const gatewayURL = getRequiredInternalServiceURL(
       "DEER_FLOW_INTERNAL_GATEWAY_BASE_URL",
-      "http://127.0.0.1:8001",
     );
 
     if (!process.env.NEXT_PUBLIC_LANGGRAPH_BASE_URL) {

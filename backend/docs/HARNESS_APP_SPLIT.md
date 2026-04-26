@@ -287,7 +287,7 @@ LangGraph Server 只需要 harness 包。`langgraph.json` 更新：
 ```bash
 # serve.sh / Makefile
 # PYTHONPATH 包含 backend/ 根目录，使 app.* 和 deerflow.* 都能被找到
-PYTHONPATH=. uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001
+PYTHONPATH=. uvicorn app.gateway.app:app --host 0.0.0.0 --port 8100
 ```
 
 ### 5.3 Nginx

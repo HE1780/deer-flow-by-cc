@@ -5,7 +5,7 @@ dev:
 	uv run langgraph dev --no-browser --no-reload --n-jobs-per-worker 10
 
 gateway:
-	PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001
+	PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8100
 
 test:
 	PYTHONPATH=. uv run pytest tests/ -v

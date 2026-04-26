@@ -297,8 +297,8 @@ DeerFlow peut recevoir des tâches depuis des applications de messagerie. Les ca
 channels:
   # LangGraph Server URL (default: http://localhost:2024)
   langgraph_url: http://localhost:2024
-  # Gateway API URL (default: http://localhost:8001)
-  gateway_url: http://localhost:8001
+  # Gateway API URL (default: http://localhost:8100)
+  gateway_url: http://localhost:8100
 
   # Optional: global session defaults for all mobile channels
   session:

@@ -8,8 +8,8 @@ DeerFlow is a LangGraph-based AI super agent system with a full-stack architectu
 
 **Architecture**:
 - **LangGraph Server** (port 2024): Agent runtime and workflow execution
-- **Gateway API** (port 8001): REST API for models, MCP, skills, memory, artifacts, uploads, and local thread cleanup
-- **Frontend** (port 3000): Next.js web interface
+- **Gateway API** (port 8100): REST API for models, MCP, skills, memory, artifacts, uploads, and local thread cleanup
+- **Frontend** (port 3110): Next.js web interface
 - **Nginx** (port 2026): Unified reverse proxy entry point
 - **Provisioner** (port 8002, optional in Docker dev): Started only when sandbox is configured for provisioner/Kubernetes mode
 
@@ -93,7 +93,7 @@ make stop       # Stop all services
 ```bash
 make install    # Install backend dependencies
 make dev        # Run LangGraph server only (port 2024)
-make gateway    # Run Gateway API only (port 8001)
+make gateway    # Run Gateway API only (port 8100)
 make test       # Run all backend tests
 make lint       # Lint with ruff
 make format     # Format code with ruff
@@ -210,7 +210,7 @@ Configuration priority:
 
 ### Gateway API (`app/gateway/`)
 
-FastAPI application on port 8001 with health check at `GET /health`.
+FastAPI application on port 8100 with health check at `GET /health`.
 
 **Routers**:
 
@@ -507,7 +507,7 @@ Bridges external messaging platforms (Feishu, Slack, Telegram) to the DeerFlow a
 
 **Configuration** (`config.yaml` -> `channels`):
 - `langgraph_url` - LangGraph Server URL (default: `http://localhost:2024`)
-- `gateway_url` - Gateway API URL for auxiliary commands (default: `http://localhost:8001`)
+- `gateway_url` - Gateway API URL for auxiliary commands (default: `http://localhost:8100`)
 - In Docker Compose, IM channels run inside the `gateway` container, so `localhost` points back to that container. Use `http://langgraph:2024` / `http://gateway:8001`, or set `DEER_FLOW_CHANNELS_LANGGRAPH_URL` / `DEER_FLOW_CHANNELS_GATEWAY_URL`.
 - Per-channel configs: `feishu` (app_id, app_secret), `slack` (bot_token, app_token), `telegram` (bot_token)
 
@@ -647,9 +647,9 @@ Gateway mode embeds the agent runtime in Gateway, no LangGraph server.
 
 **Nginx routing**:
 - Standard mode: `/api/langgraph/*` → LangGraph Server (2024)
-- Gateway mode: `/api/langgraph/*` → Gateway embedded runtime (8001) (via envsubst)
-- `/api/*` (other) → Gateway API (8001)
-- `/` (non-API) → Frontend (3000)
+- Gateway mode: `/api/langgraph/*` → Gateway embedded runtime (8100) (via envsubst)
+- `/api/*` (other) → Gateway API (8100)
+- `/` (non-API) → Frontend (3110)
 
 ### Running Backend Services Separately
 
@@ -665,7 +665,7 @@ make gateway
 
 Direct access (without nginx):
 - LangGraph: `http://localhost:2024`
-- Gateway: `http://localhost:8001`
+- Gateway: `http://localhost:8100`
 
 ### Frontend Configuration
 
