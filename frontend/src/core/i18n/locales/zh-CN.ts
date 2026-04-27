@@ -1,4 +1,4 @@
-﻿import {
+import {
   CompassIcon,
   GraduationCapIcon,
   ImageIcon,
@@ -60,8 +60,7 @@ export const zhCN: Translations = {
   // Welcome
   welcome: {
     greeting: "你好，欢迎回来！",
-    description:
-      "欢迎使用 🦌 DeerFlow，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nDeerFlow 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
+    description: "",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:
@@ -172,7 +171,7 @@ export const zhCN: Translations = {
   // Agents
   agents: {
     title: "智能体",
-    description: "创建和管理具有专属 Prompt 与能力的自定义智能体。",
+    description: "把职责、品味、流程编排与工具包组合起来。",
     newAgent: "新建智能体",
     emptyTitle: "还没有自定义智能体",
     emptyDescription: "创建你的第一个自定义智能体，设置专属系统提示词。",
@@ -449,6 +448,7 @@ export const zhCN: Translations = {
       skills: "技能中心",
       profile: "个人资料",
       orgKeys: "Org Key",
+      models: "模型管理",
     },
     pages: {
       tenantsTitle: "租户",
@@ -459,6 +459,7 @@ export const zhCN: Translations = {
       auditTitle: "审计日志",
       skillsTitle: "技能中心",
       profileTitle: "个人资料",
+      modelsTitle: "模型管理",
     },
     actions: {
       newToken: "新建令牌",

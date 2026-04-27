@@ -60,8 +60,7 @@ export const enUS: Translations = {
   // Welcome
   welcome: {
     greeting: "Hello, again!",
-    description:
-      "Welcome to 🦌 DeerFlow, an open source super agent. With built-in and custom skills, DeerFlow helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
+    description: "",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
@@ -468,6 +467,7 @@ export const enUS: Translations = {
       skills: "Skills hub",
       profile: "Profile",
       orgKeys: "Org Keys",
+      models: "Models",
     },
     pages: {
       tenantsTitle: "Tenants",
@@ -478,6 +478,7 @@ export const enUS: Translations = {
       auditTitle: "Audit log",
       skillsTitle: "Skills hub",
       profileTitle: "Profile",
+      modelsTitle: "Models",
     },
     actions: {
       newToken: "New token",

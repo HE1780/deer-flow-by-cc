@@ -390,6 +390,7 @@ export interface Translations {
       skills: string;
       profile: string;
       orgKeys: string;
+      models: string;
     };
     pages: {
       tenantsTitle: string;
@@ -400,6 +401,7 @@ export interface Translations {
       auditTitle: string;
       skillsTitle: string;
       profileTitle: string;
+      modelsTitle: string;
     };
     actions: {
       newToken: string;
