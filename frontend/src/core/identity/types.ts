@@ -180,6 +180,7 @@ export interface SwitchTenantResponse {
 export interface CreateUserPayload {
   email: string;
   display_name?: string;
+  initial_password?: string;
 }
 
 export interface AddWorkspaceMemberPayload {

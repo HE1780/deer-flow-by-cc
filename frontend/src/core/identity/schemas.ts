@@ -37,6 +37,12 @@ export type RenameWorkspaceFields = z.infer<typeof renameWorkspaceSchema>;
 export const createUserSchema = z.object({
   email: z.string().email("Must be a valid email address"),
   display_name: z.string().max(128, "Display name must be at most 128 characters").optional(),
+  initial_password: z
+    .string()
+    .refine((value) => value.length === 0 || value.length >= 8, {
+      message: "Initial password must be at least 8 characters",
+    })
+    .optional(),
 });
 export type CreateUserFields = z.infer<typeof createUserSchema>;
 

@@ -17,6 +17,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 function PasswordLoginForm({ next }: { next: string | null }) {
+  // Local password sign-in form; coexists with OIDC provider buttons.
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -96,6 +97,7 @@ function PasswordLoginForm({ next }: { next: string | null }) {
 }
 
 export default function LoginPage() {
+  // Login entry that supports both OIDC and local password in the same view.
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const next = searchParams.get("next");
@@ -146,8 +148,14 @@ export default function LoginPage() {
         </ul>
       )}
 
-      {/* Password login — shown when no OIDC providers configured */}
-      {!isLoading && !isError && providers.length === 0 && (
+      {providers.length > 0 && !isLoading && !isError && (
+        <p className="w-full text-center text-xs uppercase tracking-wide text-muted-foreground">
+          or
+        </p>
+      )}
+
+      {/* Password login — always available when auth service is reachable */}
+      {!isLoading && !isError && (
         <PasswordLoginForm next={next} />
       )}
     </main>

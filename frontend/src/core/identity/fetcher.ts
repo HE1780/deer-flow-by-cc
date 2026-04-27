@@ -3,6 +3,7 @@ import { type IdentityError, type Permission } from "./types";
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+let sessionExpiredPending = false;
 
 export function onSessionExpired(fn: Listener): () => void {
   listeners.add(fn);
@@ -11,9 +12,16 @@ export function onSessionExpired(fn: Listener): () => void {
 
 export function resetSessionExpiredListeners(): void {
   listeners.clear();
+  sessionExpiredPending = false;
+}
+
+export function consumeSessionExpired(): void {
+  sessionExpiredPending = false;
 }
 
 function emitSessionExpired(): void {
+  if (sessionExpiredPending) return;
+  sessionExpiredPending = true;
   for (const fn of listeners) fn();
 }
 

@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  consumeSessionExpired,
   identityFetch,
   onSessionExpired,
   resetSessionExpiredListeners,
@@ -42,6 +43,29 @@ describe("identityFetch", () => {
       kind: "unauthenticated",
     });
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces repeated 401 events until consumed", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("", { status: 401 }),
+    );
+
+    const listener = vi.fn();
+    onSessionExpired(listener);
+
+    await expect(identityFetch("/api/me")).rejects.toMatchObject({
+      kind: "unauthenticated",
+    });
+    await expect(identityFetch("/api/admin/tenants")).rejects.toMatchObject({
+      kind: "unauthenticated",
+    });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    consumeSessionExpired();
+    await expect(identityFetch("/api/me")).rejects.toMatchObject({
+      kind: "unauthenticated",
+    });
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 
   it("throws forbidden error on 403 with missing permission", async () => {
