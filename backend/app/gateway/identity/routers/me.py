@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -78,6 +79,11 @@ class PatchMeIn(BaseModel):
     avatar_url: str | None = None
 
 
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
 # --- Routes ---
 
 
@@ -104,6 +110,7 @@ async def me(identity: Identity = Depends(require_authenticated)):
 
 @router.patch("", response_model=MeResponse)
 async def patch_me(body: PatchMeIn, identity: Identity = Depends(require_authenticated)):
+    """Update basic profile fields for the current authenticated user."""
     rt = get_runtime()
     async with rt.session_maker() as db:
         user = (await db.execute(select(User).where(User.id == identity.user_id))).scalar_one()
@@ -113,6 +120,28 @@ async def patch_me(body: PatchMeIn, identity: Identity = Depends(require_authent
             user.avatar_url = body.avatar_url
         await db.commit()
     return await me(identity=identity)
+
+
+@router.post("/password")
+async def change_password(
+    body: ChangePasswordIn,
+    identity: Identity = Depends(require_authenticated),
+):
+    """Change the current user's password after validating the old password."""
+    if len(body.new_password) < 8:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "new_password must be at least 8 characters")
+
+    rt = get_runtime()
+    async with rt.session_maker() as db:
+        user = (await db.execute(select(User).where(User.id == identity.user_id))).scalar_one()
+        if not user.password_hash:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "password login not initialized for this user")
+        if not bcrypt.checkpw(body.old_password.encode(), user.password_hash.encode()):
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "old password is incorrect")
+
+        user.password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+        await db.commit()
+    return {"status": "ok"}
 
 
 @router.post("/switch-tenant")

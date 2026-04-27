@@ -29,6 +29,7 @@ from app.gateway.identity.auth.runtime import AuthRuntime, clear_runtime, set_ru
 from app.gateway.identity.auth.session import SessionStore
 from app.gateway.identity.bootstrap import bootstrap
 from app.gateway.identity.middlewares.identity import IdentityMiddleware
+from app.gateway.identity.models import User
 from app.gateway.identity.routers import auth as auth_router_module
 
 
@@ -250,3 +251,44 @@ async def test_lockout_after_repeated_callback_failures(app_handle):
             assert r.status_code == 302  # soft-fail redirect
         r = await c.get("/api/auth/oidc/mock/callback?code=x&state=bogus")
     assert r.status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_set_password_supports_bootstrap_token_without_session(
+    app_handle, monkeypatch
+):
+    monkeypatch.setenv("DEERFLOW_BOOTSTRAP_ADMIN_EMAIL", "bootstrap-admin@example.com")
+    monkeypatch.setenv("DEERFLOW_BOOTSTRAP_PASSWORD_TOKEN", "bootstrap-secret")
+    from app.gateway.identity.settings import get_identity_settings
+
+    get_identity_settings.cache_clear()
+
+    async with app_handle.runtime.session_maker() as db:
+        db.add(
+            User(
+                email="bootstrap-admin@example.com",
+                display_name="bootstrap-admin",
+                status=1,
+            )
+        )
+        await db.commit()
+
+    async with _client(app_handle.app) as c:
+        r = await c.post(
+            "/api/auth/set-password",
+            json={
+                "email": "bootstrap-admin@example.com",
+                "password": "ChangeMe!2026",
+                "bootstrap_token": "bootstrap-secret",
+            },
+        )
+        assert r.status_code == 200, r.text
+
+        login = await c.post(
+            "/api/auth/login",
+            json={
+                "email": "bootstrap-admin@example.com",
+                "password": "ChangeMe!2026",
+            },
+        )
+        assert login.status_code == 200, login.text

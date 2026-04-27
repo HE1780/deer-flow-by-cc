@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 
 import bcrypt
@@ -245,22 +246,28 @@ async def password_login(body: PasswordLoginIn, request: Request, response: Resp
 class SetPasswordIn(BaseModel):
     email: str
     password: str
+    bootstrap_token: str | None = None
 
 
 @router.post("/set-password")
 async def set_password(body: SetPasswordIn, request: Request):
-    """Set or update a user's password. Requires an authenticated platform_admin."""
-    from app.gateway.identity.auth.dependencies import require_authenticated
-    from app.gateway.identity.rbac.decorator import requires
-    identity = getattr(request.state, "identity", None)
-    if identity is None or not identity.is_authenticated:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
-    if "platform_admin" not in identity.roles.get("platform", []):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "platform_admin required")
+    """Set or update a user's password.
 
+    Normal mode requires an authenticated ``platform_admin``.
+    Bootstrap mode (no session) is allowed only for the configured bootstrap
+    admin email and a matching ``DEERFLOW_BOOTSTRAP_PASSWORD_TOKEN``.
+    """
+    identity = getattr(request.state, "identity", None)
     email = body.email.strip().lower()
     if len(body.password) < 8:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password must be at least 8 characters")
+
+    bootstrap_allowed = await _allow_bootstrap_password_init(identity, email, body.bootstrap_token)
+    if not bootstrap_allowed:
+        if identity is None or not identity.is_authenticated:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
+        if "platform_admin" not in identity.roles.get("platform", []):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "platform_admin required")
 
     hashed = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
 
@@ -269,6 +276,8 @@ async def set_password(body: SetPasswordIn, request: Request):
         user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
         if user is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"user {email!r} not found")
+        if bootstrap_allowed and user.password_hash:
+            raise HTTPException(status.HTTP_409_CONFLICT, "bootstrap password already initialized")
         user.password_hash = hashed
         await db.commit()
 
@@ -322,3 +331,22 @@ def _read_current_access_token(request: Request, cookie_name: str) -> str | None
     if len(parts) == 2 and parts[0].lower() == "bearer" and not parts[1].startswith("dft_"):
         return parts[1]
     return None
+
+
+async def _allow_bootstrap_password_init(identity, email: str, bootstrap_token: str | None) -> bool:
+    """Return True when a no-session bootstrap password initialization is allowed."""
+    if identity is not None and identity.is_authenticated:
+        return False
+
+    from app.gateway.identity.settings import get_identity_settings
+
+    settings = get_identity_settings()
+    bootstrap_email = (settings.bootstrap_admin_email or "").strip().lower()
+    if not bootstrap_email or email != bootstrap_email:
+        return False
+
+    expected_token = os.environ.get("DEERFLOW_BOOTSTRAP_PASSWORD_TOKEN", "").strip()
+    if not expected_token or not bootstrap_token or bootstrap_token != expected_token:
+        return False
+
+    return True

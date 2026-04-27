@@ -6,6 +6,7 @@ import asyncio
 import uuid
 from urllib.parse import parse_qs, urlparse
 
+import bcrypt
 import httpx
 import pytest
 import pytest_asyncio
@@ -14,6 +15,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from alembic import command
@@ -242,5 +244,47 @@ async def test_switch_tenant_forbidden_for_non_member(app_handle):
     try:
         r = await c.post("/api/me/switch-tenant", json={"tenant_id": 99999})
         assert r.status_code == 403
+    finally:
+        await c.aclose()
+
+
+@pytest.mark.asyncio
+async def test_change_password_updates_hash_and_allows_password_login(app_handle):
+    email = "pwd-change@example.com"
+    old_password = "OldPass!2026"
+    new_password = "NewPass!2026"
+    c = await _login(app_handle, email=email, subject="pwd-change-sub")
+    try:
+        # Seed an old password hash for this user.
+        async with app_handle.runtime.session_maker() as db:
+            from app.gateway.identity.models.user import User
+
+            user = (
+                await db.execute(select(User).where(User.email == email))
+            ).scalar_one()
+            user.password_hash = bcrypt.hashpw(
+                old_password.encode(), bcrypt.gensalt()
+            ).decode()
+            await db.commit()
+
+        bad = await c.post(
+            "/api/me/password",
+            json={"old_password": "WrongPass!2026", "new_password": new_password},
+        )
+        assert bad.status_code == 401
+
+        ok = await c.post(
+            "/api/me/password",
+            json={"old_password": old_password, "new_password": new_password},
+        )
+        assert ok.status_code == 200
+
+        # Clear session, then password-login with the new password.
+        await c.post("/api/auth/logout")
+        login = await c.post(
+            "/api/auth/login",
+            json={"email": email, "password": new_password},
+        )
+        assert login.status_code == 200
     finally:
         await c.aclose()
