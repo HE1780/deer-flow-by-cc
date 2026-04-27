@@ -1,5 +1,6 @@
 import logging
 import mimetypes
+import re
 import zipfile
 from pathlib import Path
 from urllib.parse import quote
@@ -10,6 +11,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from app.gateway.identity.settings import get_identity_settings
 from app.gateway.identity.storage.path_guard import PathEscapeError, assert_within_tenant_root
 from app.gateway.path_utils import resolve_thread_virtual_path
+from deerflow.config.paths import get_paths
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,58 @@ def _build_attachment_headers(filename: str, extra_headers: dict[str, str] | Non
     if extra_headers:
         headers.update(extra_headers)
     return headers
+
+
+_TENANT_DIR_RE = re.compile(r"^\d+$")
+
+
+def _legacy_tenant_fallback(thread_id: str, virtual_path: str) -> Path | None:
+    """Locate ``thread_id`` under the tenant-stratified tree when the legacy
+    flat path doesn't exist.
+
+    Anonymous callers (no identity in ``request.state``) hit the legacy resolver
+    which looks under ``$DEER_FLOW_HOME/threads/{thread_id}``. After M4 most new
+    threads only live under ``tenants/{tid}/workspaces/{wid}/threads/{thread_id}``
+    with no legacy symlink, so the legacy lookup 404s.
+
+    This walker scans ``tenants/*/workspaces/*/threads/{thread_id}`` once and
+    re-resolves through the tenant-aware path helper if exactly one candidate
+    is found. Multiple matches (collision across tenants) are rejected — the
+    caller has no way to disambiguate without a verified identity.
+
+    Returns ``None`` when no candidate exists or the candidate is ambiguous;
+    the caller should treat that as a 404. ``ValueError`` from the resolver
+    (invalid virtual path) is re-raised so the 400/403 surfaces unchanged.
+    """
+    base_dir = get_paths().base_dir
+    tenants_root = base_dir / "tenants"
+    if not tenants_root.is_dir():
+        return None
+
+    candidates: list[tuple[int, int]] = []
+    for tenant_dir in tenants_root.iterdir():
+        if not tenant_dir.is_dir() or not _TENANT_DIR_RE.match(tenant_dir.name):
+            continue
+        workspaces_root = tenant_dir / "workspaces"
+        if not workspaces_root.is_dir():
+            continue
+        for workspace_dir in workspaces_root.iterdir():
+            if not workspace_dir.is_dir() or not _TENANT_DIR_RE.match(workspace_dir.name):
+                continue
+            if (workspace_dir / "threads" / thread_id).is_dir():
+                candidates.append((int(tenant_dir.name), int(workspace_dir.name)))
+
+    if len(candidates) != 1:
+        if len(candidates) > 1:
+            logger.warning(
+                "artifact.fallback.ambiguous thread=%s candidates=%s",
+                thread_id,
+                candidates,
+            )
+        return None
+
+    tid, wid = candidates[0]
+    return resolve_thread_virtual_path(thread_id, virtual_path, tenant_id=tid, workspace_id=wid)
 
 
 def is_text_file_by_content(path: Path, sample_size: int = 8192) -> bool:
@@ -202,7 +256,17 @@ async def get_artifact(thread_id: str, path: str, request: Request, download: bo
                 )
                 raise HTTPException(status_code=403, detail="Access denied") from None
             return actual
-        return resolve_thread_virtual_path(thread_id, virtual_path)
+        # Legacy / anonymous branch: try the flat path first, then fall back
+        # to a tenant-tree scan so artifacts created post-M4 (which no longer
+        # leave a legacy symlink) remain reachable when the request can't be
+        # authenticated. Tenant-scoped callers bypass this entirely above.
+        legacy = resolve_thread_virtual_path(thread_id, virtual_path)
+        if legacy.exists():
+            return legacy
+        fallback = _legacy_tenant_fallback(thread_id, virtual_path)
+        if fallback is not None:
+            return fallback
+        return legacy
 
     # Check if this is a request for a file inside a .skill archive (e.g., xxx.skill/SKILL.md)
     if ".skill/" in path:
