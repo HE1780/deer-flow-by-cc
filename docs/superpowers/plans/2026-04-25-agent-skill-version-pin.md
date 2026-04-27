@@ -2,13 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**状态：** open · actionable — 依赖（agent-fix-i18n）已 ship，本计划尚未启动；可随时领走执行
+**优先级：** 低于自托管 epic
+**关联 spec：** [../specs/archive/2026-04-25-skill-agent-i18n-design.md](../specs/archive/2026-04-25-skill-agent-i18n-design.md)（共享设计）
+
 **Goal:** 让 Agent 能在 `config.yaml` 中 pin skill 到具体版本（`skill-name@v1.2.0`），并通过 `manifest.yaml` 声明 skill 所需的工具组、MCP 依赖和 org key 注入，运行时自动合并这些依赖。
 
 **Architecture:** 两个层面的改动。后端：扩展 `AgentConfig` 支持 `name@version` 格式和 `org_key_env`，新增 `manifest.yaml` 解析器，在 `make_lead_agent` 中调用 `_resolve_skills_and_deps()` 自动合并 tool_groups 和 env；现有 `SKILL.md` frontmatter 格式不变，`manifest.yaml` 是可选的同目录补充文件。前端：Agent 编辑页新增技能关联 UI（多选 + 版本下拉）。
 
 **Tech Stack:** Python 3.12, Pydantic v2, PyYAML, TypeScript / Next.js 16, pnpm, pytest, Vitest
 
-**依赖：** 必须在计划 A（`2026-04-25-agent-fix-i18n.md`）完成后开始，因为本计划依赖 `agent_name` 已正确注入 configurable。
+**依赖：** 必须在计划 A（`archive/2026-04-25-agent-fix-i18n.md`，已 ship）完成后开始，因为本计划依赖 `agent_name` 已正确注入 configurable。
 
 ---
 

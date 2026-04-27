@@ -1,8 +1,10 @@
 # LoopDetectionMiddleware 清空 tool_calls 留下孤儿 ToolMessage 的修复
 
 **记录日期：** 2026-04-27
+**状态：** open · 长期 parking lot（self-hosting epic 之后再修；优先级低于自托管）
 **严重程度：** P1 — 用户分析任务被卡住无法继续
 **与 langgraph-compat 关系：** 无关（standard mode 同样存在），只是切换后用户活跃度高暴露出来
+**待办：** 实施计划尚未撰写；推荐 A 方案（用 `RemoveMessage` 清孤儿）。详见下文。
 
 ---
 
@@ -127,4 +129,4 @@ A 方案大约 **20-40 行代码改动 + 2-3 个测试**。需要新建测试 fi
 ## 关联
 
 - 触发的"Console Error: Unexpected tool message outside a processing group" 在 [frontend/src/core/messages/utils.ts:83](../../../frontend/src/core/messages/utils.ts#L83) 也只是兜底，可以不动——root cause 修了它就不再出现
-- 同时观察到的 "Event loop is closed" 是另一个独立问题，记录在 [docs/superpowers/plans/2026-04-27-identity-langgraph-passthrough-bug.md](../plans/2026-04-27-identity-langgraph-passthrough-bug.md) 的副作用列表
+- 同时观察到的 "Event loop is closed" 是另一个独立问题，记录在 [docs/superpowers/plans/archive/2026-04-27-identity-langgraph-passthrough-bug.md](../plans/archive/2026-04-27-identity-langgraph-passthrough-bug.md) 的副作用列表

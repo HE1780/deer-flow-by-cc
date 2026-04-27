@@ -35,9 +35,9 @@ upstream = https://github.com/bytedance/deer-flow.git    ← ByteDance; READ-ONL
 1. **Working directory:** `/Users/lydoc/projectscoding/deer-flow/.worktrees/m7-admin-ui/`
 2. **Branch:** `feat/m7-admin-ui` (already checked out in the worktree)
 3. **Base branch:** `docs/p0-implementation-plans` (not `main` — see "State of the repo" below)
-4. **Plan to execute:** [`docs/superpowers/plans/2026-04-23-m7a-admin-ui.md`](../plans/2026-04-23-m7a-admin-ui.md)
+4. **Plan to execute:** [`docs/superpowers/plans/2026-04-23-m7a-admin-ui.md`](../plans/archive/2026-04-23-m7a-admin-ui.md)
 5. **Spec (reference):** [`docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md`](../specs/2026-04-21-deerflow-identity-foundation-design.md) §8 (Admin UI), §11.2 (test scenarios)
-6. **Original M7 plan (reference, superseded by above):** [`docs/superpowers/plans/2026-04-21-m7-admin-ui-migration-release.md`](../plans/2026-04-21-m7-admin-ui-migration-release.md)
+6. **Original M7 plan (reference, superseded by above):** [`docs/superpowers/plans/2026-04-21-m7-admin-ui-migration-release.md`](../plans/archive/2026-04-21-m7-admin-ui-migration-release.md)
 
 Start by reading items 4 → 5 → 6 in that order. The new plan at (4) supersedes Part A of (6).
 
@@ -82,7 +82,7 @@ See [`backend/CLAUDE.md`](../../../backend/CLAUDE.md) "Identity Subsystem" secti
    - Ran `pnpm install` in `frontend/` — 55s, clean.
    - Baseline: `pnpm typecheck` clean, `pnpm test` → 21/21 passing.
 
-3. **Re-planned M7 Part A** as four sequenced PRs on one branch (file `docs/superpowers/plans/2026-04-23-m7a-admin-ui.md`):
+3. **Re-planned M7 Part A** as four sequenced PRs on one branch (file `docs/superpowers/plans/archive/2026-04-23-m7a-admin-ui.md`):
    - **A1 — Foundation** (16 tasks, fully TDD): backend `/api/auth/providers`; frontend identity core (types, fetcher, hooks, guards, session-expired modal); login/logout/callback pages; `middleware.ts`; minimal `/admin/profile`; Playwright A1 suite.
    - **A2 — Admin shell + 9 read-only pages** (task-list level): admin layout, tenant switcher, backend read endpoints, all list/detail pages, audit.
    - **A3 — Writes** (task-list level): create/edit/revoke forms, backend write endpoints, profile tabs with token/session mgmt.
@@ -174,7 +174,7 @@ Repeat for A3 and A4.
 
 1. **Don't assume `main` has the feature work.** `origin/main` only has the spec doc. All M1–M7 commits live on `docs/p0-implementation-plans`. Every feature branch must be based on the integration branch.
 
-2. **Don't conflate the original M7 plan with this session's plan.** The original (`2026-04-21-m7-admin-ui-migration-release.md`) is task-list level and covers all three parts (A/B/C). This session produced a new, detailed plan for Part A only (`2026-04-23-m7a-admin-ui.md`). Execute the new one.
+2. **Don't conflate the original M7 plan with this session's plan.** The original (`archive/2026-04-21-m7-admin-ui-migration-release.md`) is task-list level and covers all three parts (A/B/C). This session produced a new, detailed plan for Part A only (`archive/2026-04-23-m7a-admin-ui.md`). Both plans archived 2026-04-28 once shipped.
 
 3. **Don't read a skill's markdown file directly.** Use the `Skill` tool. Reading the file defeats progressive disclosure and (per the superpowers system reminders) is explicitly disallowed.
 
@@ -194,11 +194,11 @@ Repeat for A3 and A4.
 ## Key files and paths — quick reference
 
 ```
-Plan (this session's deliverable):
-  docs/superpowers/plans/2026-04-23-m7a-admin-ui.md
+Plan (this session's deliverable, archived 2026-04-28):
+  docs/superpowers/plans/archive/2026-04-23-m7a-admin-ui.md
 
-Original plan (superseded for Part A):
-  docs/superpowers/plans/2026-04-21-m7-admin-ui-migration-release.md
+Original plan (superseded for Part A, archived 2026-04-28):
+  docs/superpowers/plans/archive/2026-04-21-m7-admin-ui-migration-release.md
 
 Spec:
   docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md
