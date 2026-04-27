@@ -29,7 +29,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           href="/admin/profile"
           className="block border-b px-4 py-3 text-lg font-semibold tracking-tight"
         >
-          DeerFlow Admin
+          系统管理
         </Link>
         <AdminSidebar />
       </aside>

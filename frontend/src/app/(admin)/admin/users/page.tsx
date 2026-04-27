@@ -177,6 +177,7 @@ function CreateUserDialog({
   tenantId: number;
   onClose: () => void;
 }) {
+  // Dialog form for tenant user onboarding, with optional local-password bootstrap.
   const { t } = useI18n();
   const create = useCreateUser(tenantId);
   const {
@@ -188,9 +189,14 @@ function CreateUserDialog({
 
   const onSubmit = async (data: CreateUserFields) => {
     try {
+      const initialPassword = data.initial_password?.trim();
       await create.mutateAsync({
         email: data.email,
         display_name: data.display_name?.trim() ?? undefined,
+        initial_password:
+          initialPassword && initialPassword.length > 0
+            ? initialPassword
+            : undefined,
       });
       onClose();
     } catch {
@@ -233,6 +239,24 @@ function CreateUserDialog({
               {...register("display_name")}
               data-testid="users-create-display-name"
             />
+          </div>
+          <div className="grid gap-1 text-sm">
+            <label htmlFor="users-create-initial-password">
+              Initial password (optional)
+            </label>
+            <Input
+              id="users-create-initial-password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              {...register("initial_password")}
+              data-testid="users-create-initial-password"
+            />
+            {errors.initial_password && (
+              <p className="text-xs text-destructive">
+                {errors.initial_password.message}
+              </p>
+            )}
           </div>
           {errors.root && (
             <p className="text-sm text-red-600" role="alert">

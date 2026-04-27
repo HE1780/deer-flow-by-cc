@@ -31,6 +31,7 @@ const ITEMS: Item[] = [
   { href: "/admin/audit", labelKey: "audit", requires: "audit:read" },
   { href: "/admin/org-keys", labelKey: "orgKeys", requires: "membership:read" },
   { href: "/admin/skills", labelKey: "skills", requires: "skill:manage" },
+  { href: "/admin/models", labelKey: "models", platformOnly: true },
 ];
 
 export function AdminSidebar() {
