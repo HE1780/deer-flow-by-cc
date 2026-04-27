@@ -382,7 +382,7 @@ async def create_org_key(
             (tenant_id, name, prefix, token_hash, allowed_skills, no_expiry,
              expires_at, auto_rotate_at, created_by, created_at)
         VALUES
-            (:tenant_id, :name, :prefix, :token_hash, :allowed_skills::jsonb,
+            (:tenant_id, :name, :prefix, :token_hash, CAST(:allowed_skills AS jsonb),
              :no_expiry, :expires_at, :auto_rotate_at, :created_by, :now)
         RETURNING id, name, prefix, no_expiry, expires_at, auto_rotate_at,
                   last_used_at, revoked_at, created_at

@@ -13,6 +13,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
+import bcrypt
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -225,6 +226,53 @@ def test_create_user_400_for_invalid_email(writes_app):
             json={"email": "not-an-email", "display_name": "Bad"},
         )
     assert r.status_code == 422  # pydantic email validation
+
+
+def test_create_user_with_initial_password_sets_hash(writes_app):
+    app, holder = writes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=5)
+
+    class _Sess(_StubSession):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            result = MagicMock()
+            # existing user lookup -> none, membership lookup -> none
+            result.scalar_one_or_none.return_value = None
+            return result
+
+        def add(self, obj):
+            super().add(obj)
+            from app.gateway.identity.models import User
+
+            if isinstance(obj, User):
+                obj.id = 43
+                obj.created_at = datetime(2026, 4, 24, tzinfo=UTC)
+                obj.last_login_at = None
+                obj.status = 1
+                obj.avatar_url = None
+
+    holder["session"] = _Sess()
+    with TestClient(app) as c:
+        r = c.post(
+            "/api/tenants/5/users",
+            json={
+                "email": "password-user@example.com",
+                "display_name": "Pwd User",
+                "initial_password": "ChangeMe!2026",
+            },
+        )
+    assert r.status_code == 201, r.text
+
+    from app.gateway.identity.models import User
+
+    created_user = next(obj for obj in holder["session"].added if isinstance(obj, User))
+    assert created_user.password_hash is not None
+    assert created_user.password_hash != "ChangeMe!2026"
+    assert bcrypt.checkpw(b"ChangeMe!2026", created_user.password_hash.encode())
 
 
 # ---------------------------------------------------------------------------

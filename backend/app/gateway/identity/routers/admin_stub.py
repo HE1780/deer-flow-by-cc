@@ -42,19 +42,7 @@ async def delete_skill_stub(tid: int, wid: int, skid: int):
     return {"tid": tid, "wid": wid, "skid": skid, "deleted": True}
 
 
-@router.post(
-    "/api/tenants/{tid}/workspaces",
-    status_code=201,
-    dependencies=[Depends(requires("workspace:create", "tenant"))],
-)
-async def create_workspace_stub(tid: int):
-    return {"tid": tid, "workspace_id": 2}
-
-
-@router.post(
-    "/api/admin/tenants",
-    status_code=201,
-    dependencies=[Depends(requires("tenant:create", "platform"))],
-)
-async def create_tenant_stub():
-    return {"tenant_id": 2}
+# NOTE: ``POST /api/tenants/{tid}/workspaces`` and ``POST /api/admin/tenants``
+# stubs were removed when M7A A3 landed real handlers in ``admin_writes.py``.
+# Routes are matched in registration order, so the stubs were shadowing the
+# real handlers and silently making "create" calls a no-op.

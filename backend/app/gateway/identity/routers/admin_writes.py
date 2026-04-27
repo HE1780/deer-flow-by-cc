@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from typing import Any
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
@@ -43,6 +44,7 @@ _EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 class CreateUserIn(BaseModel):
     email: str
     display_name: str | None = None
+    initial_password: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -50,6 +52,15 @@ class CreateUserIn(BaseModel):
         v = v.strip()
         if not _EMAIL_RE.match(v):
             raise ValueError("invalid email format")
+        return v
+
+    @field_validator("initial_password")
+    @classmethod
+    def _password_shape(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        if len(v) < 8:
+            raise ValueError("initial_password must be at least 8 characters")
         return v
 
 
@@ -137,10 +148,14 @@ async def create_user(
     """
     existing = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
     if existing is None:
+        password_hash = None
+        if body.initial_password:
+            password_hash = bcrypt.hashpw(body.initial_password.encode(), bcrypt.gensalt()).decode()
         user = User(
             email=body.email,
             display_name=body.display_name or body.email.split("@")[0],
             status=1,
+            password_hash=password_hash,
         )
         session.add(user)
         await session.flush()
