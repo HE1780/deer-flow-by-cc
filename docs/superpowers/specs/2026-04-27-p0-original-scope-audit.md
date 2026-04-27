@@ -98,7 +98,7 @@
 |---|---|---|
 | AuditMiddleware | ✅ | — |
 | AuditBatchWriter (PG 写入 + 队列) | ✅ | — |
-| Fallback JSONL | ⚠️ **当前损坏** | `fallback.jsonl` 是目录而非文件，启动报 IsADirectoryError；需修 |
+| Fallback JSONL | ✅ 已修复 | 2026-04-27 修 `migrate_to_multitenant.py` 构造 FallbackLog 的 bug（commit `9e7184fd`），救回 58 条迁移审计事件并 backfill 到 PG |
 | Retention job | ✅ 代码 | 实际 cron 没启过 |
 | `GET /api/tenants/{tid}/audit` 分页 | ✅ | UI 验证 |
 | `GET /api/tenants/{tid}/audit/export` CSV | ✅ | UI 验证 |
@@ -110,7 +110,7 @@
 
 ### P0 — 阻塞"管理端可用"的修复
 
-1. **Audit fallback.jsonl 损坏** — Gateway 启动 IsADirectoryError，影响审计写入兜底
+1. ~~**Audit fallback.jsonl 损坏**~~ ✅ 已修复（commit `9e7184fd`，2026-04-27）
 2. **14 个 admin 页面浏览器逐项验证** — 重点关注：
    - 5/6 租户增删改 + stats
    - 7/8 用户创建/禁用/角色关联
