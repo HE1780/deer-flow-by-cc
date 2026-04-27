@@ -417,7 +417,9 @@ def _make_audit_writer(skip_db: bool):
     from app.gateway.identity.audit.fallback import FallbackLog
     from app.gateway.identity.storage.paths import deerflow_home
 
-    log = FallbackLog(deerflow_home() / "_audit" / "fallback.jsonl")
+    # FallbackLog wants the deerflow root; it appends _audit/fallback.jsonl
+    # internally. Passing the full file path causes nested directories.
+    log = FallbackLog(deerflow_home())
 
     async def _write(event, critical: bool) -> None:  # noqa: ARG001 — contract
         await log.write(event)
