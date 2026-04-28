@@ -2668,3 +2668,38 @@ class TestChannelManagerIdentity:
         _, kwargs = fake_paths.resolve_virtual_path.call_args
         assert kwargs.get("tenant_id") == 7
         assert kwargs.get("workspace_id") == 3
+
+
+class TestResolveAttachmentsTenantAware:
+    """Real-filesystem regression test for the outputs_dir boundary check in
+    ``_resolve_attachments``: when tenant ids flow in, the boundary check
+    must use the tenant-aware outputs_dir; otherwise legitimate artifacts
+    resolved under tenants/{T}/workspaces/{W}/... get rejected as
+    path-traversal attempts."""
+
+    def test_outputs_dir_uses_tenant_path(self, tmp_path):
+        from unittest.mock import patch
+
+        from app.channels.manager import _resolve_attachments
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        outputs = paths.resolve_sandbox_outputs_dir(
+            "thread-x", tenant_id=1, workspace_id=1
+        )
+        outputs.mkdir(parents=True, exist_ok=True)
+        (outputs / "report.md").write_text("# hello", encoding="utf-8")
+
+        # ``manager._resolve_attachments`` performs a lazy ``from deerflow.config.paths
+        # import get_paths`` inside the function — patch the source module instead.
+        with patch("deerflow.config.paths.get_paths", return_value=paths):
+            attachments = _resolve_attachments(
+                "thread-x",
+                ["/mnt/user-data/outputs/report.md"],
+                tenant_id=1,
+                workspace_id=1,
+            )
+
+        assert len(attachments) == 1
+        assert attachments[0].filename == "report.md"
+        assert attachments[0].size > 0
