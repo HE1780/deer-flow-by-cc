@@ -5,6 +5,16 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let sessionExpiredPending = false;
 
+/** Internal-only extension of RequestInit. Set to `true` on the refresh
+ *  call itself and on the single post-refresh retry, so a real 401 in
+ *  either of those code paths surfaces directly without recursing. */
+type InternalInit = RequestInit & { _skipRefreshOn401?: boolean };
+
+/** Singleflight slot. While a refresh is in-flight, all concurrent 401
+ *  callers await the same promise. `null` once the refresh resolves so a
+ *  later 401 starts a fresh attempt. */
+let pendingRefresh: Promise<boolean> | null = null;
+
 export function onSessionExpired(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
