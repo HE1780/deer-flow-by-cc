@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from deerflow.config.agents_api_config import get_agents_api_config
 from deerflow.config.agents_config import AgentConfig, list_custom_agents, load_agent_config, load_agent_soul
+from deerflow.config.app_config import get_app_config
 from deerflow.config.paths import get_paths
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,18 @@ class AgentsListResponse(BaseModel):
     """Response model for listing all custom agents."""
 
     agents: list[AgentResponse]
+
+
+class ToolGroupResponse(BaseModel):
+    """Response model for a single tool group."""
+
+    name: str = Field(..., description="Tool group name")
+
+
+class ToolGroupsListResponse(BaseModel):
+    """Response model for listing all tool groups defined in config.yaml."""
+
+    tool_groups: list[ToolGroupResponse]
 
 
 class AgentCreateRequest(BaseModel):
@@ -103,6 +116,24 @@ def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False
         skills=agent_cfg.skills,
         org_key_env=agent_cfg.org_key_env,
         soul=soul,
+    )
+
+
+@router.get(
+    "/tool-groups",
+    response_model=ToolGroupsListResponse,
+    summary="List Tool Groups",
+    description="List all tool groups defined in config.yaml.",
+)
+async def list_tool_groups() -> ToolGroupsListResponse:
+    """Return the names of every tool group from the active config.yaml.
+
+    Used by the agent edit page to populate the tool-groups multi-select.
+    """
+    _require_agents_api_enabled()
+    cfg = get_app_config()
+    return ToolGroupsListResponse(
+        tool_groups=[ToolGroupResponse(name=g.name) for g in cfg.tool_groups]
     )
 
 
