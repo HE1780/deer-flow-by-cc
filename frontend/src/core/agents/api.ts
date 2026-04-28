@@ -63,6 +63,19 @@ export async function deleteAgent(name: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete agent: ${res.statusText}`);
 }
 
+export interface ToolGroupSummary {
+  name: string;
+}
+
+export async function listToolGroups(): Promise<ToolGroupSummary[]> {
+  const res = await fetch(`${getBackendBaseURL()}/api/tool-groups`);
+  if (!res.ok) {
+    throw new Error(`Failed to load tool groups: ${res.statusText}`);
+  }
+  const data = (await res.json()) as { tool_groups: ToolGroupSummary[] };
+  return data.tool_groups;
+}
+
 export async function checkAgentName(
   name: string,
 ): Promise<{ available: boolean; name: string }> {
