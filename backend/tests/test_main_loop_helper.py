@@ -175,3 +175,50 @@ def test_set_main_loop_replaces_closed_loop_after_full_lifecycle():
         assert ml.has_main_loop() is True
     finally:
         loop_b.close()
+
+
+def test_main_loop_handles_cached_client_after_ephemeral_loop_dies():
+    """Regression for 'Event loop is closed' (root cause report 2026-04-28).
+
+    Simulates the langchain_openai lru_cache: a shared 'httpx_like_client'
+    object whose .last_loop attribute records which loop touched it last.
+    Step 1: an ephemeral loop touches the client and then closes.
+    Step 2: the main loop touches the same client. Before the fix this
+    crashed because the client tried to call_soon on the dead loop.
+    After the fix the main loop runs the coroutine cleanly because work
+    is funneled through submit_to_main_loop.
+    """
+
+    class FakeCachedClient:
+        def __init__(self):
+            self.last_loop: asyncio.AbstractEventLoop | None = None
+
+        async def use(self):
+            self.last_loop = asyncio.get_running_loop()
+            return id(self.last_loop)
+
+    cached = FakeCachedClient()
+
+    # Step 1: ephemeral loop uses the client, then closes.
+    ephemeral_loop = asyncio.new_event_loop()
+    try:
+        ephemeral_loop_id = ephemeral_loop.run_until_complete(cached.use())
+        assert cached.last_loop is ephemeral_loop
+    finally:
+        ephemeral_loop.close()
+
+    # Step 2: main loop uses the SAME cached client via submit_to_main_loop.
+    # The fix ensures the call runs on the still-alive main loop, not on
+    # the dead ephemeral one.
+    main_loop = asyncio.new_event_loop()
+    t = _spin_loop_in_thread(main_loop)
+    ml._main_loop = main_loop
+    ml._main_loop_thread_id = t.ident
+
+    try:
+        main_loop_id = ml.submit_to_main_loop(cached.use)
+        assert main_loop_id != ephemeral_loop_id
+        assert cached.last_loop is main_loop
+    finally:
+        _stop_loop(main_loop, t)
+        main_loop.close()
