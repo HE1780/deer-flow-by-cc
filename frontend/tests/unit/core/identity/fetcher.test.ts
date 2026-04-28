@@ -29,8 +29,9 @@ function makeSequencedFetchMock(
       throw new Error(`fetch route exhausted: ${key} (only ${queue.length} responses defined)`);
     }
     cursors[key] = idx + 1;
-    // Response objects can only be read once — clone before returning so a single
-    // pre-built Response can serve a single call. Tests build new Response per slot.
+    // Response objects can only be read once. Each slot in the routes array is a
+    // distinct new Response(...), so returning it directly is safe — it will be
+    // consumed exactly once by the caller.
     return resp;
   });
 }
@@ -200,7 +201,7 @@ describe("identityFetch", () => {
     expect(results).toHaveLength(5);
     // All retries succeeded; bodies are returned in some order but each `i`
     // appears exactly once.
-    expect(results.map((r) => r.i).sort()).toEqual([0, 1, 2, 3, 4]);
+    expect(results.map((r) => r.i).sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
     expect(listener).not.toHaveBeenCalled();
 
     // Specifically: refresh URL was hit exactly once.
