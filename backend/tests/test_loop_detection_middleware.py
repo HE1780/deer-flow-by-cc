@@ -3,7 +3,7 @@
 import copy
 from unittest.mock import MagicMock
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 
 from deerflow.agents.middlewares.loop_detection_middleware import (
     _HARD_STOP_MSG,
@@ -636,3 +636,163 @@ class TestToolFrequencyDetection:
         msg = result["messages"][0]
         assert isinstance(msg, AIMessage)
         assert _HARD_STOP_MSG in msg.content
+
+
+class TestHardStopOrphanToolMessageRemoval:
+    """Hard stop must clean orphan ToolMessages whose tool_call_id matches
+    the AIMessage being stripped. Otherwise strict providers (MiniMax/Anthropic)
+    reject the next call with 400 "tool result's tool id ... not found".
+
+    Spec: docs/superpowers/specs/2026-04-27-loop-detection-orphan-tool-msg.md
+    """
+
+    def _state_with_tool_msg(self, tool_calls, tool_call_ids_for_results):
+        """Build state where AIMessage has tool_calls AND matching ToolMessages
+        already exist in history (simulates: tools already executed, history
+        has the responses, then loop detection fires hard_stop)."""
+        ai_msg = AIMessage(content="thinking...", tool_calls=tool_calls)
+        tool_msgs = [
+            ToolMessage(content=f"result for {tcid}", tool_call_id=tcid)
+            for tcid in tool_call_ids_for_results
+        ]
+        # Order in real history: AI msg → its ToolMessages.
+        # But the LATEST AIMessage (the one with the loop) is at the end.
+        # For loop detection to trigger on it, it must be messages[-1].
+        # So we layer: prior AIMessage with tool_calls → prior ToolMessages → latest looping AIMessage.
+        prior_ai = AIMessage(
+            content="prior turn",
+            tool_calls=[{"name": tc["name"], "id": tcid, "args": tc["args"]}
+                        for tc, tcid in zip(tool_calls, tool_call_ids_for_results)],
+        )
+        return {"messages": [prior_ai, *tool_msgs, ai_msg]}
+
+    def test_hard_stop_emits_remove_message_for_orphan_tool_msg(self):
+        """When hard_stop strips tool_calls from last AIMessage, any ToolMessage
+        in history whose tool_call_id matches must be removed via RemoveMessage."""
+        mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
+        runtime = _make_runtime()
+
+        looping_call_id = "call_loop_1"
+        tool_calls = [{"name": "bash", "id": looping_call_id, "args": {"command": "ls"}}]
+
+        # Trip the loop detector with 3 prior identical calls
+        for _ in range(3):
+            mw._apply(_make_state(tool_calls=tool_calls), runtime)
+
+        # 4th call: hard_stop fires. Build state where the looping AIMessage's
+        # tool_call already produced a ToolMessage in history.
+        state = self._state_with_tool_msg(tool_calls, [looping_call_id])
+        result = mw._apply(state, runtime)
+
+        assert result is not None
+        msgs = result["messages"]
+        # Expect: at least one RemoveMessage + the stripped AIMessage
+        remove_msgs = [m for m in msgs if isinstance(m, RemoveMessage)]
+        ai_msgs = [m for m in msgs if isinstance(m, AIMessage)]
+
+        assert len(remove_msgs) == 1, f"expected 1 RemoveMessage, got {remove_msgs}"
+        assert len(ai_msgs) == 1, f"expected 1 stripped AIMessage, got {ai_msgs}"
+
+        # The RemoveMessage targets the orphan ToolMessage by its message id.
+        # ToolMessage in fixture had no explicit id, so langchain auto-assigns one.
+        # Look up the orphan in fixture state and verify the RemoveMessage points to it.
+        orphan_tool_msg = next(
+            m for m in state["messages"]
+            if isinstance(m, ToolMessage) and m.tool_call_id == looping_call_id
+        )
+        assert remove_msgs[0].id == orphan_tool_msg.id
+
+        # The stripped AIMessage must have tool_calls cleared (existing contract)
+        assert ai_msgs[0].tool_calls == []
+        assert _HARD_STOP_MSG in ai_msgs[0].content
+
+    def test_hard_stop_no_remove_when_no_orphan_exists(self):
+        """If the looping AIMessage's tool_calls have not been executed yet
+        (no matching ToolMessage in history), no RemoveMessage is emitted.
+        This covers the case where loop detection fires in after_model
+        before the tool node runs."""
+        mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
+        runtime = _make_runtime()
+
+        tool_calls = [{"name": "bash", "id": "call_no_result", "args": {"command": "ls"}}]
+
+        for _ in range(3):
+            mw._apply(_make_state(tool_calls=tool_calls), runtime)
+
+        # 4th call: hard_stop fires, but ToolMessage hasn't been added to history
+        result = mw._apply(_make_state(tool_calls=tool_calls), runtime)
+
+        assert result is not None
+        msgs = result["messages"]
+        remove_msgs = [m for m in msgs if isinstance(m, RemoveMessage)]
+        ai_msgs = [m for m in msgs if isinstance(m, AIMessage)]
+
+        assert len(remove_msgs) == 0, f"no orphan exists → no RemoveMessage; got {remove_msgs}"
+        assert len(ai_msgs) == 1
+        assert ai_msgs[0].tool_calls == []
+
+    def test_hard_stop_removes_only_matching_orphans_not_unrelated_tool_msgs(self):
+        """Narrow scope: RemoveMessage targets ONLY ToolMessages whose tool_call_id
+        is in the looping AIMessage's tool_calls. Unrelated ToolMessages from
+        prior valid turns must remain untouched."""
+        mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
+        runtime = _make_runtime()
+
+        looping_id = "call_loop"
+        unrelated_id = "call_unrelated_earlier_turn"
+
+        tool_calls = [{"name": "bash", "id": looping_id, "args": {"command": "ls"}}]
+
+        for _ in range(3):
+            mw._apply(_make_state(tool_calls=tool_calls), runtime)
+
+        # Build history with:
+        #   - unrelated valid AI+Tool pair from earlier (must NOT be removed)
+        #   - looping AI msg with its already-produced ToolMessage (orphan to clean)
+        unrelated_ai = AIMessage(
+            content="earlier valid turn",
+            tool_calls=[{"name": "bash", "id": unrelated_id, "args": {"command": "pwd"}}],
+        )
+        unrelated_tool = ToolMessage(content="/home", tool_call_id=unrelated_id, id="msg_unrelated_tool")
+        looping_orphan_tool = ToolMessage(content="result", tool_call_id=looping_id, id="msg_looping_orphan")
+        looping_ai = AIMessage(content="loop", tool_calls=tool_calls)
+
+        state = {
+            "messages": [unrelated_ai, unrelated_tool, looping_orphan_tool, looping_ai]
+        }
+        result = mw._apply(state, runtime)
+
+        assert result is not None
+        remove_msgs = [m for m in result["messages"] if isinstance(m, RemoveMessage)]
+        # Only the looping orphan ToolMessage gets removed
+        assert len(remove_msgs) == 1
+        assert remove_msgs[0].id == looping_orphan_tool.id
+        # The unrelated ToolMessage's id must NOT be in any RemoveMessage
+        removed_ids = {m.id for m in remove_msgs}
+        assert unrelated_tool.id not in removed_ids
+
+    def test_hard_stop_handles_multiple_tool_calls_in_one_message(self):
+        """Hard-stop AIMessage may carry several tool_calls; each with a matching
+        ToolMessage in history must produce its own RemoveMessage."""
+        mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
+        runtime = _make_runtime()
+
+        ids = ["call_a", "call_b"]
+        tool_calls = [
+            {"name": "bash", "id": "call_a", "args": {"command": "ls"}},
+            {"name": "bash", "id": "call_b", "args": {"command": "pwd"}},
+        ]
+
+        for _ in range(3):
+            mw._apply(_make_state(tool_calls=tool_calls), runtime)
+
+        looping_ai = AIMessage(content="loop", tool_calls=tool_calls)
+        orphans = [ToolMessage(content=f"r_{tcid}", tool_call_id=tcid) for tcid in ids]
+        state = {"messages": [*orphans, looping_ai]}
+
+        result = mw._apply(state, runtime)
+        assert result is not None
+        remove_msgs = [m for m in result["messages"] if isinstance(m, RemoveMessage)]
+        assert len(remove_msgs) == 2
+        removed_ids = {m.id for m in remove_msgs}
+        assert removed_ids == {orphans[0].id, orphans[1].id}

@@ -22,7 +22,7 @@ from typing import override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, RemoveMessage
 from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
@@ -348,12 +348,27 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         warning, hard_stop = self._track_and_check(state, runtime)
 
         if hard_stop:
-            # Strip tool_calls from the last AIMessage to force text output
+            # Strip tool_calls from the last AIMessage to force text output.
+            # Also remove any ToolMessage in history whose tool_call_id matches
+            # the stripped AIMessage's tool_calls — otherwise strict providers
+            # (MiniMax / Anthropic) reject the next request with
+            # "tool result's tool id ... not found".
             messages = state.get("messages", [])
             last_msg = messages[-1]
+            stripped_tool_call_ids = {
+                tc["id"]
+                for tc in (getattr(last_msg, "tool_calls", None) or [])
+                if tc.get("id")
+            }
+            orphan_removals = [
+                RemoveMessage(id=m.id)
+                for m in messages
+                if getattr(m, "type", None) == "tool"
+                and getattr(m, "tool_call_id", None) in stripped_tool_call_ids
+            ]
             content = self._append_text(last_msg.content, warning or _HARD_STOP_MSG)
             stripped_msg = last_msg.model_copy(update=self._build_hard_stop_update(last_msg, content))
-            return {"messages": [stripped_msg]}
+            return {"messages": [*orphan_removals, stripped_msg]}
 
         if warning:
             # Inject as HumanMessage instead of SystemMessage to avoid
