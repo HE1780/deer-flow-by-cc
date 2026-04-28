@@ -1,5 +1,9 @@
 // frontend/src/core/identity/api.ts
-import { identityFetch } from "./fetcher";
+import {
+  IdentityFetchError,
+  _refreshSessionForIdentityApi,
+  identityFetch,
+} from "./fetcher";
 import {
   type AddWorkspaceMemberPayload,
   type AuditFilters,
@@ -54,11 +58,17 @@ export const identityApi = {
   providers: () => identityFetch<ProvidersResponse>("/api/auth/providers"),
   logout: () =>
     identityFetch<{ status: string }>("/api/auth/logout", { method: "POST" }),
-  refresh: () =>
-    identityFetch<{ access_token: string; expires_in: number }>(
-      "/api/auth/refresh",
-      { method: "POST" },
-    ),
+  refresh: async () => {
+    // Delegates to fetcher's internal singleflight so concurrent callers
+    // (interceptor + any future direct caller) coalesce into one network
+    // call. The resolved shape is preserved for back-compat; today no
+    // caller reads it.
+    const ok = await _refreshSessionForIdentityApi();
+    if (!ok) {
+      throw new IdentityFetchError({ kind: "unauthenticated" });
+    }
+    return { access_token: "", expires_in: 0 };
+  },
 
   // --- A2: admin reads ---
   switchTenant: (tenantId: number) =>
