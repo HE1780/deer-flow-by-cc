@@ -541,3 +541,26 @@ class TestTenantAwarePathResolution:
 
         assert result is not None
         assert "legacy.csv" in result["messages"][-1].content
+
+
+class TestIdentityFlowsThroughLeadAgentState:
+    """Integration smoke: when IdentityMiddleware (or test stub) writes identity
+    into state, UploadsMiddleware reads the same dict via state.get('identity')."""
+
+    def test_state_with_dict_identity_routes_to_tenant_path(self, tmp_path):
+        """Smoke test using a plain dict (covering the dict-style identity case)."""
+        mw = _middleware(tmp_path)
+        tenant_uploads = mw._paths.resolve_sandbox_uploads_dir(
+            THREAD_ID, tenant_id=1, workspace_id=1
+        )
+        tenant_uploads.mkdir(parents=True, exist_ok=True)
+        (tenant_uploads / "via_dict.csv").write_text("x", encoding="utf-8")
+
+        msg = _human("test")
+        state = {
+            "messages": [msg],
+            "identity": {"tenant_id": 1, "workspace_id": 1},  # dict not dataclass
+        }
+        result = mw.before_agent(state, _runtime(thread_id=THREAD_ID))
+        assert result is not None
+        assert "via_dict.csv" in result["messages"][-1].content
