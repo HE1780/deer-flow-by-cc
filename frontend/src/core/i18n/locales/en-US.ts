@@ -63,8 +63,7 @@ export const enUS: Translations = {
     description: "",
 
     createYourOwnSkill: "Create Your Own Skill",
-    createYourOwnSkillDescription:
-      "Create your own skill to release the power of DeerFlow. With customized skills,\nDeerFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+    createYourOwnSkillDescription: "",
   },
 
   // Clipboard
