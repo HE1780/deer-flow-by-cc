@@ -99,6 +99,30 @@ def submit_to_main_loop(coro_factory: Callable[[], Coroutine[Any, Any, Any]]) ->
     return future.result()
 
 
+async def shutdown_main_loop() -> None:
+    """Cancel all in-flight futures and clear the main-loop registration.
+
+    Called by Gateway lifespan teardown. Intentionally does NOT wait for
+    cancellation to settle — open-development policy: in-flight memory
+    updates may be lost (timer will retry next debounce window) and
+    in-flight subagents return FAILED.
+    """
+    global _main_loop, _main_loop_thread_id, _shutting_down
+    with _lock:
+        if _shutting_down:
+            return
+        _shutting_down = True
+    # Cancel all tracked futures. iterate over snapshot since the WeakSet
+    # may mutate as futures complete.
+    for fut in list(_tracked_futures):
+        if not fut.done():
+            fut.cancel()
+    with _lock:
+        _main_loop = None
+        _main_loop_thread_id = None
+    logger.info("Main asyncio loop deregistered; in-flight futures cancelled")
+
+
 def _reset_for_tests() -> None:
     """Wipe state. ONLY for unit tests; never call from product code."""
     global _main_loop, _main_loop_thread_id, _shutting_down

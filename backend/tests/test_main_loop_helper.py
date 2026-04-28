@@ -106,3 +106,52 @@ def test_submit_from_main_loop_thread_raises_for_deadlock_safety():
             ml.submit_to_main_loop(lambda: asyncio.sleep(0))
     finally:
         loop.close()
+
+
+def test_shutdown_blocks_subsequent_submits():
+    loop = asyncio.new_event_loop()
+    ml._main_loop = loop
+    ml._main_loop_thread_id = -1  # any thread id ≠ test thread, so submit path validates ok before shutdown check
+    try:
+        # Run shutdown_main_loop synchronously by driving it on a temp loop.
+        asyncio.new_event_loop().run_until_complete(ml.shutdown_main_loop())
+        assert ml.has_main_loop() is False
+        with pytest.raises(RuntimeError, match="not registered"):
+            ml.submit_to_main_loop(lambda: asyncio.sleep(0))
+    finally:
+        loop.close()
+
+
+def test_shutdown_cancels_in_flight_futures():
+    loop = asyncio.new_event_loop()
+    t = _spin_loop_in_thread(loop)
+    ml._main_loop = loop
+    ml._main_loop_thread_id = t.ident
+    try:
+        # Long-running coroutine submitted from another thread.
+        result_holder: list[Exception | int] = []
+
+        def submitter():
+            try:
+                async def long_sleep():
+                    await asyncio.sleep(10)
+                    return "should not reach"
+
+                result_holder.append(ml.submit_to_main_loop(long_sleep))
+            except concurrent.futures.CancelledError as e:
+                result_holder.append(e)
+            except Exception as e:
+                result_holder.append(e)
+
+        st = threading.Thread(target=submitter, daemon=True)
+        st.start()
+        time.sleep(0.05)  # let submitter enqueue
+
+        # Shutdown should cancel the long_sleep future.
+        asyncio.new_event_loop().run_until_complete(ml.shutdown_main_loop())
+        st.join(timeout=2)
+        assert len(result_holder) == 1
+        assert isinstance(result_holder[0], concurrent.futures.CancelledError)
+    finally:
+        _stop_loop(loop, t)
+        loop.close()
