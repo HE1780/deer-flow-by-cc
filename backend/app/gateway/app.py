@@ -51,6 +51,7 @@ from app.gateway.routers import (
     uploads,
 )
 from deerflow.config.app_config import get_app_config
+from deerflow.runtime.main_loop import set_main_loop, shutdown_main_loop
 
 # Configure logging
 logging.basicConfig(
@@ -308,6 +309,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if get_identity_settings().enabled:
         await _init_audit_subsystem(app)
 
+    # Register the main Uvicorn loop so memory updater / subagent executor
+    # can hand sync work to it instead of spinning ephemeral loops
+    # (see docs/superpowers/specs/2026-04-28-llm-event-loop-closed-design.md).
+    set_main_loop(asyncio.get_running_loop())
+
     # Initialize LangGraph runtime components (StreamBridge, RunManager, checkpointer, store)
     async with langgraph_runtime(app):
         logger.info("LangGraph runtime initialised")
@@ -340,6 +346,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             except Exception:
                 logger.exception("Failed to stop channel service")
 
+            await shutdown_main_loop()
             await _shutdown_audit_subsystem(app)
             await _shutdown_identity_subsystem()
 
