@@ -134,3 +134,34 @@ plus `\|`-alternation easily masks one of them).
 * Spec: [`docs/superpowers/specs/2026-04-28-uploads-tenant-aware-design.md`](superpowers/specs/2026-04-28-uploads-tenant-aware-design.md)
 * Plan: [`docs/superpowers/plans/2026-04-28-uploads-tenant-aware.md`](superpowers/plans/2026-04-28-uploads-tenant-aware.md)
 * Memory: `feedback_cross_cutting_api_migration.md`
+
+## 2026-04-28: "假死循环" 先排查 max_tokens,再排查 prompt/检测器
+
+**Symptom:** 模型反复 `write_file` / `str_replace` 写同一个文件直到 recursion 上限,
+看起来像 prompt 死循环或 LoopDetectionMiddleware 失灵。
+
+**Root causes are TWO, not one:**
+
+1. **Prompt / 路径设计问题** —— ToolMessage 是 `Error: ...`,模型不断重试。LoopDetection
+   Layer 3 已处理(同 path 连续失败 → warn=3 / hard=4)。
+2. **LLM `max_tokens` 偏小** —— ToolMessage 是 `OK`,但上一次 AIMessage 的 `content`
+   或 tool args 在传输中被服务端**截断**。模型读自己的 message 看到"没写完"于是再写一次。
+   表现完全相同,但属于**模型输出容量不够**,不是 agent 行为问题。
+
+**实战:** 2026-04-28 排查 dual-dir-loop 时,会话 1 (HTML 编码) 表现是死循环,实际触发原因
+是 [config.yaml](../config.yaml) 里 MiniMax `max_tokens` 偏小,把生成中段的 HTML 切了。
+用户调到 184096(模型上限附近)后问题消失。
+
+**How to apply:**
+
+1. 看到"反复写同一个文件" → 第一时间打开 thread state JSON,**看最近 N 条 ToolMessage 的
+   content** —— 全是 `OK`?那是 max_tokens;掺着 `Error: ...`?那是 prompt/路径。
+2. **不要**在 LoopDetectionMiddleware 里加 "AIMessage 输出截断检测"。那是模型容量问题,
+   应该让操作员调 config,不应该让 middleware 替模型擦屁股。
+3. 新模型上线时把 `max_tokens` 设到供应商文档明确支持的最大值,留 16-32k 余量给 input。
+   过小的 `max_tokens` 在长产物场景(HTML/MD/代码)是隐性陷阱。
+
+**Related artefacts:**
+
+* Spec: [`docs/superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md`](superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md)(排查附录节)
+* Config: [`config.yaml`](../config.yaml) `models[name=minimax-m2.7].max_tokens`

@@ -1,11 +1,12 @@
 # workspace/outputs 双目录设计触发 agent 死循环
 
-- **状态**:🟡 主因已修,前端 UI 刷新边角已两层下挖,**最新一层未 smoke 验证**(2026-04-28 晚)
+- **状态**:✅ 全部闭环(2026-04-28 晚,用户 smoke 通过)
   - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main —— 但 onLangChainEvent 是死代码,**实际不工作**(见文末"晚间追查")
   - 分支 2 (prompt simplification — direct write to outputs):✅ 已合入 cc-main —— **死循环消除,模型不再崩溃**
   - 分支 3 (LoopDetection path-failure narrow detector):✅ 已合入 cc-main(7 新测试 + 50 老测试全绿)
   - 分支 4 (messages-watcher invalidation,替换分支 1 的死代码):✅ 已合入 cc-main(commit `d67e0e13`,14 新测)
-  - 分支 5 (str_replace 切纯路径 URL,触发 HTTP fetch):✅ 已合入 cc-main(commit `b62d35bc`)—— **未 push,未 smoke 回归**
+  - 分支 5 (str_replace 切纯路径 URL,触发 HTTP fetch):✅ 已合入 cc-main + 用户 smoke 通过(commit `b62d35bc`)
+  - 配套观察 (LLM `max_tokens` 偏小):✅ 用户已自行调整 `config.yaml`(MiniMax → 184096),HTML 生成截断问题消除
 
 ### 用户手工 smoke 反馈(2026-04-28)
 
@@ -230,3 +231,23 @@ last 3 commits:
 **还没做的小尾巴**:
 - `git push origin cc-main` ——push 之前先做完上面的 smoke。
 - 如果 (c) 是真的,记得把这一层根因 append 到本 spec,不要覆盖前面的诊断历史。
+
+---
+
+## 2026-04-28 闭环 + 排查清单
+
+### 用户 smoke 结果
+
+`b62d35bc` 落地后,用户复测:write_file → str_replace 整个流程,artifact 面板第二次编辑后**正确显示新内容**。本 spec 标记为 ✅ 闭环。
+
+### 排查附录:LLM `max_tokens` 偏小导致 HTML 生成"假死循环"
+
+本次会话排查过程中,用户额外指出**会话 1 (HTML 编码场景)** 反复 `write_file` 还有一个独立诱因:
+
+- [config.yaml:16-27](../../../config.yaml#L16-L27) 中 `minimax-m2.7` 的 `max_tokens` 配得偏小,模型生成完整 HTML 时被服务端在中段截断。
+- 截断后的 HTML 不是合法文档,模型自己读到"上次没写完",于是再写一次,再被截断——表现上像死循环,但**根因是输出长度上限**,不是 prompt 设计或 LoopDetection 失灵。
+- **修复**:用户已把 `max_tokens` 调整到 184096(MiniMax 上限附近);HTML 生成不再截断,该路径的"假死循环"消除。
+- **教训**:遇到"模型反复写同一个文件直到崩溃"先看两条线索——
+  1. 工具调用的 `output` 是不是 `Error: ...`(prompt / 路径设计问题,LoopDetection Layer 3 处理)
+  2. AIMessage 的 `content` / 上一次 tool args 是不是被截断在中间(`max_tokens` 不够,需要调 config.yaml,**不是 bug**)
+- 这条记到 `docs/lessons.md` 比较合适,但不要在 LoopDetection Layer 3 里加 token-truncation 检测——那是模型容量问题,不是 agent 行为问题。
