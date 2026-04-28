@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import app.gateway.routers.agents as agents_router
+import deerflow.config.paths as paths_module
 from deerflow.config.agents_api_config import AgentsApiConfig
 from deerflow.config.app_config import AppConfig
+from deerflow.config.paths import Paths
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.tool_config import ToolGroupConfig
 
@@ -69,13 +74,6 @@ def test_list_tool_groups_returns_403_when_agents_api_disabled(monkeypatch):
 
     assert response.status_code == 403
     assert "agents_api.enabled" in response.json()["detail"]
-
-
-import yaml
-from pathlib import Path
-
-import deerflow.config.paths as paths_module
-from deerflow.config.paths import Paths
 
 
 @pytest.fixture
