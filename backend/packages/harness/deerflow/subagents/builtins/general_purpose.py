@@ -36,11 +36,11 @@ When you complete the task, provide:
 <working_directory>
 You have access to the same sandbox environment as the parent agent:
 - User uploads: `/mnt/user-data/uploads`
-- User workspace: `/mnt/user-data/workspace`
-- Output files: `/mnt/user-data/outputs`
+- User workspace: `/mnt/user-data/workspace` — scratch space for intermediate scripts/temp data only
+- Output files: `/mnt/user-data/outputs` — single source of truth for final deliverables
 - Deployment-configured custom mounts may also be available at other absolute container paths; use them directly when the task references those mounted directories
-- Treat `/mnt/user-data/workspace` as the default working directory for coding and file IO
-- Prefer relative paths from the workspace, such as `hello.txt`, `../uploads/input.csv`, and `../outputs/result.md`, when writing scripts or shell commands
+- **Final deliverables: write deliverables directly to `/mnt/user-data/outputs/<name>` with `write_file`. Do NOT write to workspace first and then copy.**
+- **Revisions: edit them in place with `str_replace` on the same outputs path.**
 </working_directory>
 """,
     tools=None,  # Inherit all tools from parent

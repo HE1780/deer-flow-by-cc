@@ -50,7 +50,19 @@ def test_apply_prompt_template_includes_custom_mounts(monkeypatch):
     assert "Custom Mounted Directories" in prompt
 
 
-def test_apply_prompt_template_includes_relative_path_guidance(monkeypatch):
+def test_apply_prompt_template_directs_deliverables_to_outputs(monkeypatch):
+    """Final deliverables must go directly to /mnt/user-data/outputs.
+
+    The previous prompt told the model to write deliverables in
+    /mnt/user-data/workspace and then copy them to /mnt/user-data/outputs.
+    The model frequently skipped the copy step, leaving outputs empty;
+    on the next user-requested edit it then targeted the non-existent
+    outputs file and looped forever (see specs/2026-04-28-workspace-
+    outputs-dual-dir-loop.md).
+
+    The new contract: deliverables are written directly to outputs,
+    and revisions edit that same outputs path in place.
+    """
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),
@@ -64,8 +76,16 @@ def test_apply_prompt_template_includes_relative_path_guidance(monkeypatch):
 
     prompt = prompt_module.apply_prompt_template()
 
-    assert "Treat `/mnt/user-data/workspace` as your default current working directory" in prompt
-    assert "`hello.txt`, `../uploads/data.csv`, and `../outputs/report.md`" in prompt
+    # Deliverables go directly to outputs (no copy ceremony).
+    assert "write deliverables directly to `/mnt/user-data/outputs/" in prompt
+    # Revisions edit the same outputs file in place.
+    assert "edit them in place with `str_replace`" in prompt
+    # The old "must be copied" wording is gone — copying was the failure mode.
+    assert "must be copied to `/mnt/user-data/outputs`" not in prompt
+    # workspace is still mentioned (for intermediate scripts/temp data),
+    # but is no longer presented as the "default current working directory"
+    # for deliverables.
+    assert "default current working directory" not in prompt
 
 
 def test_refresh_skills_system_prompt_cache_async_reloads_immediately(monkeypatch, tmp_path):

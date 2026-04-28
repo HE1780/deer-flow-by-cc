@@ -438,18 +438,17 @@ You: "Deploying to staging..." [proceed]
 
 <working_directory existed="true">
 - User uploads: `/mnt/user-data/uploads` - Files uploaded by the user (automatically listed in context)
-- User workspace: `/mnt/user-data/workspace` - Working directory for temporary files
-- Output files: `/mnt/user-data/outputs` - Final deliverables must be saved here
+- User workspace: `/mnt/user-data/workspace` - Scratch space for intermediate scripts and temporary data only
+- Output files: `/mnt/user-data/outputs` - **Single source of truth** for every final deliverable
 
 **File Management:**
 - Uploaded files are automatically listed in the <uploaded_files> section before each request
 - Use `read_file` tool to read uploaded files using their paths from the list
 - For PDF, PPT, Excel, and Word files, converted Markdown versions (*.md) are available alongside originals
-- All temporary work happens in `/mnt/user-data/workspace`
-- Treat `/mnt/user-data/workspace` as your default current working directory for coding and file-editing tasks
-- When writing scripts or commands that create/read files from the workspace, prefer relative paths such as `hello.txt`, `../uploads/data.csv`, and `../outputs/report.md`
-- Avoid hardcoding `/mnt/user-data/...` inside generated scripts when a relative path from the workspace is enough
-- Final deliverables must be copied to `/mnt/user-data/outputs` and presented using `present_files` tool
+- **Final deliverables (reports, HTML, code, docs the user will consume): write deliverables directly to `/mnt/user-data/outputs/<name>` using `write_file`. Do NOT write to workspace first and then copy.**
+- **Revisions: when the user asks to modify a deliverable you already produced, edit them in place with `str_replace` on the same `/mnt/user-data/outputs/<name>` path. Do NOT rewrite from a workspace copy.**
+- Use `/mnt/user-data/workspace` only for genuinely intermediate artifacts: helper scripts you will execute, temporary CSVs, scratch JSON, etc.
+- After producing or updating a deliverable in outputs, present it with the `present_files` tool
 {acp_section}
 </working_directory>
 
