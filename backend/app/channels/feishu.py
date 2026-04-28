@@ -7,6 +7,7 @@ import json
 import logging
 import re
 import threading
+from pathlib import Path
 from typing import Any, Literal
 
 from app.channels.base import Channel
@@ -282,7 +283,35 @@ class FeishuChannel(Channel):
             raise RuntimeError(f"Feishu file upload failed: code={response.code}, msg={response.msg}")
         return response.data.file_key
 
-    async def receive_file(self, msg: InboundMessage, thread_id: str) -> InboundMessage:
+    def _resolve_uploads_dir(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: int | None,
+        workspace_id: int | None,
+    ) -> Path:
+        """Return the host-side uploads directory for *thread_id*, creating it on demand.
+
+        Routes through ``Paths.resolve_sandbox_uploads_dir`` so identity-on
+        requests write under ``tenants/{T}/workspaces/{W}/...``; falls back to
+        the legacy single-tenant layout when ids are absent or non-positive.
+        """
+        paths = get_paths()
+        paths.ensure_thread_dirs_for(
+            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+        )
+        return paths.resolve_sandbox_uploads_dir(
+            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+        ).resolve()
+
+    async def receive_file(
+        self,
+        msg: InboundMessage,
+        thread_id: str,
+        *,
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
+    ) -> InboundMessage:
         """Download a Feishu file into the thread uploads directory.
 
         Returns the sandbox virtual path when the image is persisted successfully.
@@ -297,15 +326,30 @@ class FeishuChannel(Channel):
         text = msg.text
         for file in files:
             if file.get("image_key"):
-                virtual_path = await self._receive_single_file(msg.thread_ts, file["image_key"], "image", thread_id)
+                virtual_path = await self._receive_single_file(
+                    msg.thread_ts, file["image_key"], "image", thread_id,
+                    tenant_id=tenant_id, workspace_id=workspace_id,
+                )
                 text = text.replace("[image]", virtual_path, 1)
             elif file.get("file_key"):
-                virtual_path = await self._receive_single_file(msg.thread_ts, file["file_key"], "file", thread_id)
+                virtual_path = await self._receive_single_file(
+                    msg.thread_ts, file["file_key"], "file", thread_id,
+                    tenant_id=tenant_id, workspace_id=workspace_id,
+                )
                 text = text.replace("[file]", virtual_path, 1)
         msg.text = text
         return msg
 
-    async def _receive_single_file(self, message_id: str, file_key: str, type: Literal["image", "file"], thread_id: str) -> str:
+    async def _receive_single_file(
+        self,
+        message_id: str,
+        file_key: str,
+        type: Literal["image", "file"],
+        thread_id: str,
+        *,
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
+    ) -> str:
         request = self._GetMessageResourceRequest.builder().message_id(message_id).file_key(file_key).type(type).build()
 
         def inner():
@@ -343,9 +387,9 @@ class FeishuChannel(Channel):
             logger.warning("[Feishu] empty resource content: resource_key=%s, type=%s", file_key, type)
             return f"Failed to obtain the [{type}]"
 
-        paths = get_paths()
-        paths.ensure_thread_dirs_for(thread_id)
-        uploads_dir = paths.resolve_sandbox_uploads_dir(thread_id).resolve()
+        uploads_dir = self._resolve_uploads_dir(
+            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+        )
 
         ext = "png" if type == "image" else "bin"
         raw_filename = getattr(response, "file_name", "") or f"feishu_{file_key[-12:]}.{ext}"

@@ -770,7 +770,13 @@ class ChannelManager:
             service = get_channel_service()
             channel = service.get_channel(msg.channel_name) if service else None
             logger.info("[Manager] preparing receive file context for %d attachments", len(msg.files))
-            msg = await channel.receive_file(msg, thread_id) if channel else msg
+            msg = (
+                await channel.receive_file(
+                    msg, thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+                )
+                if channel
+                else msg
+            )
         if extra_context:
             run_context.update(extra_context)
 

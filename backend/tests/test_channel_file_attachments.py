@@ -458,3 +458,36 @@ class TestManagerArtifactResolution:
         result = _format_artifact_text(["/mnt/user-data/outputs/a.txt", "/mnt/user-data/outputs/b.txt"])
         assert "a.txt" in result
         assert "b.txt" in result
+
+
+class TestFeishuResolveUploadsDir:
+    """Pure-function test for the new helper that decides where Feishu writes
+    downloaded files. Covers both tenant-aware and legacy fallback paths."""
+
+    def test_with_tenant_returns_tenant_path(self, tmp_path):
+        from app.channels.feishu import FeishuChannel
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        with patch("app.channels.feishu.get_paths", return_value=paths):
+            ch = FeishuChannel.__new__(FeishuChannel)  # bypass __init__ (lark sdk side effects)
+            result = ch._resolve_uploads_dir("thread-z", tenant_id=2, workspace_id=3)
+
+        expected = paths.resolve_sandbox_uploads_dir(
+            "thread-z", tenant_id=2, workspace_id=3
+        ).resolve()
+        assert result == expected
+        assert result.is_dir()  # ensure_thread_dirs_for created it
+
+    def test_without_tenant_returns_legacy(self, tmp_path):
+        from app.channels.feishu import FeishuChannel
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        with patch("app.channels.feishu.get_paths", return_value=paths):
+            ch = FeishuChannel.__new__(FeishuChannel)
+            result = ch._resolve_uploads_dir("thread-z", tenant_id=None, workspace_id=None)
+
+        expected = paths.resolve_sandbox_uploads_dir("thread-z").resolve()
+        assert result == expected
+        assert result.is_dir()

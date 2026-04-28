@@ -107,7 +107,14 @@ class Channel(ABC):
                 except Exception:
                     logger.exception("[%s] failed to upload file %s", self.name, attachment.filename)
 
-    async def receive_file(self, msg: InboundMessage, thread_id: str) -> InboundMessage:
+    async def receive_file(
+        self,
+        msg: InboundMessage,
+        thread_id: str,
+        *,
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
+    ) -> InboundMessage:
         """
         Optionally process and materialize inbound file attachments for this channel.
 
@@ -119,6 +126,11 @@ class Channel(ABC):
         Args:
             msg: The inbound message, possibly containing file metadata in msg.files.
             thread_id: The resolved DeerFlow thread ID for sandbox path context.
+            tenant_id: Optional tenant id (M4 storage isolation). When supplied with
+                ``workspace_id``, downloaded files land in the tenant-stratified
+                uploads directory; otherwise the legacy single-tenant layout is
+                used. Both ids must be positive ints to take effect.
+            workspace_id: See ``tenant_id``.
 
         Returns:
             The (possibly modified) InboundMessage, with text and/or files updated as needed.
