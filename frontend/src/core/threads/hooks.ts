@@ -226,7 +226,7 @@ export function useThreadStream({
         // [DEBUG: artifact-invalidation] Temporary diagnostic — see
         // docs/superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md.
         // Remove once event.data shape is confirmed.
-        console.debug("[artifact-invalidation] on_tool_end", {
+        console.warn("[artifact-invalidation] on_tool_end", {
           name: event.name,
           data: event.data,
         });
@@ -237,7 +237,7 @@ export function useThreadStream({
         });
         const mutatedPath = extractWriteFilePath(event.name, event.data);
 
-        console.debug("[artifact-invalidation] extractor result", {
+        console.warn("[artifact-invalidation] extractor result", {
           toolName: event.name,
           mutatedPath,
         });
@@ -250,7 +250,7 @@ export function useThreadStream({
             exact: false,
           });
 
-          console.debug(
+          console.warn(
             "[artifact-invalidation] invalidateQueries called",
             ["artifact", mutatedPath],
           );
