@@ -1,7 +1,27 @@
 import os
 import re
 import shutil
+import warnings
 from pathlib import Path, PureWindowsPath
+
+_LEGACY_DEPRECATION_MSG = (
+    "Paths.{name}() is deprecated; use {replacement}(thread_id, "
+    "tenant_id=..., workspace_id=...) which falls back to the legacy "
+    "single-tenant layout when ids are absent or non-positive."
+)
+
+
+def _warn_legacy(name: str, replacement: str) -> None:
+    """Emit a ``DeprecationWarning`` for a legacy ``Paths`` method.
+
+    ``stacklevel=3`` points the warning at the caller of the legacy method
+    (caller -> legacy method -> ``_warn_legacy``).
+    """
+    warnings.warn(
+        _LEGACY_DEPRECATION_MSG.format(name=name, replacement=replacement),
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 # Virtual path prefix seen by agents inside the sandbox
 VIRTUAL_PATH_PREFIX = "/mnt/user-data"
@@ -164,52 +184,60 @@ class Paths:
         return self.agent_dir(name) / "memory.json"
 
     def thread_dir(self, thread_id: str) -> Path:
-        """Host path for a thread's data (legacy single-tenant layout).
+        """DEPRECATED: use :meth:`resolve_thread_dir` instead.
 
-        Delegates to :meth:`resolve_thread_dir` which inlines the legacy
-        ``{base_dir}/threads/{thread_id}/`` fallback when no identity ids are
-        supplied. Tenant-aware callers should use :meth:`resolve_thread_dir`
-        directly.
+        Host path for a thread's data (legacy single-tenant layout).
 
         Raises:
             ValueError: If `thread_id` contains unsafe characters (path separators
                         or `..`) that could cause directory traversal.
         """
+        _warn_legacy("thread_dir", "resolve_thread_dir")
         return self.resolve_thread_dir(thread_id)
 
     def sandbox_work_dir(self, thread_id: str) -> Path:
-        """Host path for the agent's workspace directory (legacy layout).
+        """DEPRECATED: use :meth:`resolve_sandbox_work_dir` instead.
 
+        Host path for the agent's workspace directory (legacy layout).
         Sandbox: `/mnt/user-data/workspace/`
         """
+        _warn_legacy("sandbox_work_dir", "resolve_sandbox_work_dir")
         return self.resolve_sandbox_work_dir(thread_id)
 
     def sandbox_uploads_dir(self, thread_id: str) -> Path:
-        """Host path for user-uploaded files (legacy layout).
+        """DEPRECATED: use :meth:`resolve_sandbox_uploads_dir` instead.
 
+        Host path for user-uploaded files (legacy layout).
         Sandbox: `/mnt/user-data/uploads/`
         """
+        _warn_legacy("sandbox_uploads_dir", "resolve_sandbox_uploads_dir")
         return self.resolve_sandbox_uploads_dir(thread_id)
 
     def sandbox_outputs_dir(self, thread_id: str) -> Path:
-        """Host path for agent-generated artifacts (legacy layout).
+        """DEPRECATED: use :meth:`resolve_sandbox_outputs_dir` instead.
 
+        Host path for agent-generated artifacts (legacy layout).
         Sandbox: `/mnt/user-data/outputs/`
         """
+        _warn_legacy("sandbox_outputs_dir", "resolve_sandbox_outputs_dir")
         return self.resolve_sandbox_outputs_dir(thread_id)
 
     def acp_workspace_dir(self, thread_id: str) -> Path:
-        """Host path for the ACP workspace of a specific thread (legacy layout).
+        """DEPRECATED: use :meth:`resolve_acp_workspace_dir` instead.
 
+        Host path for the ACP workspace of a specific thread (legacy layout).
         Sandbox: `/mnt/acp-workspace/`
         """
+        _warn_legacy("acp_workspace_dir", "resolve_acp_workspace_dir")
         return self.resolve_acp_workspace_dir(thread_id)
 
     def sandbox_user_data_dir(self, thread_id: str) -> Path:
-        """Host path for the user-data root (legacy layout).
+        """DEPRECATED: use :meth:`resolve_sandbox_user_data_dir` instead.
 
+        Host path for the user-data root (legacy layout).
         Sandbox: `/mnt/user-data/`
         """
+        _warn_legacy("sandbox_user_data_dir", "resolve_sandbox_user_data_dir")
         return self.resolve_sandbox_user_data_dir(thread_id)
 
     def host_thread_dir(self, thread_id: str) -> str:
@@ -237,20 +265,19 @@ class Paths:
         return _join_host_path(self.host_thread_dir(thread_id), "acp-workspace")
 
     def ensure_thread_dirs(self, thread_id: str) -> None:
-        """Create all standard sandbox directories for a thread (legacy layout).
+        """DEPRECATED: use :meth:`ensure_thread_dirs_for` instead.
 
-        Delegates to :meth:`ensure_thread_dirs_for` which falls back to the
-        legacy single-tenant layout when no identity ids are supplied.
+        Create all standard sandbox directories for a thread (legacy layout).
         """
+        _warn_legacy("ensure_thread_dirs", "ensure_thread_dirs_for")
         self.ensure_thread_dirs_for(thread_id)
 
     def delete_thread_dir(self, thread_id: str) -> None:
-        """Delete all persisted data for a thread (legacy layout).
+        """DEPRECATED: use :meth:`delete_thread_dir_for` instead.
 
-        Delegates to :meth:`delete_thread_dir_for` which falls back to the
-        legacy single-tenant layout when no identity ids are supplied.
-        Idempotent.
+        Delete all persisted data for a thread (legacy layout). Idempotent.
         """
+        _warn_legacy("delete_thread_dir", "delete_thread_dir_for")
         self.delete_thread_dir_for(thread_id)
 
     def delete_thread_dir_for(

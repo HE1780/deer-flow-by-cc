@@ -202,3 +202,69 @@ class TestDeleteThreadDirFor:
         paths.delete_thread_dir_for("thread-p", tenant_id=5, workspace_id=None)
 
         assert not legacy.exists()
+
+
+import warnings
+
+
+class TestLegacyMethodDeprecation:
+    """Eight legacy Paths methods must emit DeprecationWarning when called
+    directly, while still returning the same legacy-layout values they always did."""
+
+    def test_each_legacy_method_warns_and_returns_legacy_path(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+        thread_id = "thread-dep"
+
+        cases = [
+            ("thread_dir", lambda: paths.thread_dir(thread_id),
+             tmp_path / "threads" / thread_id),
+            ("sandbox_work_dir", lambda: paths.sandbox_work_dir(thread_id),
+             tmp_path / "threads" / thread_id / "user-data" / "workspace"),
+            ("sandbox_uploads_dir", lambda: paths.sandbox_uploads_dir(thread_id),
+             tmp_path / "threads" / thread_id / "user-data" / "uploads"),
+            ("sandbox_outputs_dir", lambda: paths.sandbox_outputs_dir(thread_id),
+             tmp_path / "threads" / thread_id / "user-data" / "outputs"),
+            ("acp_workspace_dir", lambda: paths.acp_workspace_dir(thread_id),
+             tmp_path / "threads" / thread_id / "acp-workspace"),
+            ("sandbox_user_data_dir", lambda: paths.sandbox_user_data_dir(thread_id),
+             tmp_path / "threads" / thread_id / "user-data"),
+        ]
+        for name, fn, expected in cases:
+            with pytest.warns(DeprecationWarning, match=name):
+                result = fn()
+            assert result == expected, f"{name} returned {result}, expected {expected}"
+
+    def test_ensure_thread_dirs_warns_and_creates_legacy_layout(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+
+        with pytest.warns(DeprecationWarning, match="ensure_thread_dirs"):
+            paths.ensure_thread_dirs("thread-e")
+
+        assert (tmp_path / "threads" / "thread-e" / "user-data" / "uploads").is_dir()
+
+    def test_delete_thread_dir_warns_and_removes_legacy(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+        legacy = tmp_path / "threads" / "thread-d"
+        legacy.mkdir(parents=True)
+
+        with pytest.warns(DeprecationWarning, match="delete_thread_dir"):
+            paths.delete_thread_dir("thread-d")
+
+        assert not legacy.exists()
+
+    def test_resolve_helpers_do_not_warn(self, tmp_path):
+        """resolve_* / *_for methods (the new API) MUST NOT emit DeprecationWarning."""
+        paths = Paths(base_dir=str(tmp_path))
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            paths.resolve_thread_dir("t1")
+            paths.resolve_sandbox_uploads_dir("t1")
+            paths.resolve_sandbox_outputs_dir("t1")
+            paths.resolve_sandbox_work_dir("t1")
+            paths.resolve_acp_workspace_dir("t1")
+            paths.resolve_sandbox_user_data_dir("t1")
+            paths.ensure_thread_dirs_for("t1")
+            paths.delete_thread_dir_for("t1")
+            # With ids:
+            paths.resolve_thread_dir("t1", tenant_id=1, workspace_id=1)
+            paths.delete_thread_dir_for("t1", tenant_id=1, workspace_id=1)

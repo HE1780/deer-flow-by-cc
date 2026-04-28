@@ -201,7 +201,7 @@ def _get_acp_workspace_host_path(thread_id: str | None = None) -> str | None:
         try:
             from deerflow.config.paths import get_paths
 
-            host_path = get_paths().acp_workspace_dir(thread_id)
+            host_path = get_paths().resolve_acp_workspace_dir(thread_id)
             if host_path.exists():
                 return str(host_path)
         except Exception:
