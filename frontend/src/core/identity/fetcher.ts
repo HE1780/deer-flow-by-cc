@@ -35,6 +35,25 @@ function emitSessionExpired(): void {
   for (const fn of listeners) fn();
 }
 
+/** Singleflight refresh helper. Returns `true` if the access cookie was
+ *  re-issued, `false` otherwise. Internal-only — the only caller is
+ *  identityFetch's 401 branch (and `identityApi.refresh` via re-export). */
+async function refreshSession(): Promise<boolean> {
+  if (pendingRefresh) return pendingRefresh;
+  pendingRefresh = identityFetch<unknown>("/api/auth/refresh", {
+    method: "POST",
+    _skipRefreshOn401: true,
+  } as InternalInit)
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      pendingRefresh = null;
+    });
+  return pendingRefresh;
+}
+
+export { refreshSession as _refreshSessionForIdentityApi };
+
 /** Error thrown by identityFetch. Carries the IdentityError variant so callers
  *  can switch on `err.kind`. Extends `Error` so lint rules that require thrown
  *  values to be Error instances are satisfied. */
