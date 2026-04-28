@@ -1,10 +1,10 @@
 """Subagent execution engine."""
 
 import asyncio
+import concurrent.futures
 import logging
 import threading
 import uuid
-import concurrent.futures
 from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
