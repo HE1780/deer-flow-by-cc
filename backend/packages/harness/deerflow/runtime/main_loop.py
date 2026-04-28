@@ -36,6 +36,33 @@ def has_main_loop() -> bool:
     return _main_loop is not None and not _shutting_down
 
 
+def set_main_loop(loop: asyncio.AbstractEventLoop) -> None:
+    """Register the long-lived main event loop. Called by Gateway lifespan.
+
+    Re-registering the same loop is a no-op. Registering a different loop
+    while one is already active raises RuntimeError — production should
+    only have one main loop per process.
+    """
+    global _main_loop, _main_loop_thread_id
+    with _lock:
+        if _main_loop is loop:
+            return
+        if _main_loop is not None:
+            raise RuntimeError(
+                "main loop is already registered; cannot replace at runtime"
+            )
+        _main_loop = loop
+        _main_loop_thread_id = threading.get_ident()
+        logger.info("Main asyncio loop registered (thread_id=%s)", _main_loop_thread_id)
+
+
+def get_main_loop() -> asyncio.AbstractEventLoop:
+    """Return the registered main loop. Raises RuntimeError if unset."""
+    if _main_loop is None:
+        raise RuntimeError("main loop is not registered")
+    return _main_loop
+
+
 def _reset_for_tests() -> None:
     """Wipe state. ONLY for unit tests; never call from product code."""
     global _main_loop, _main_loop_thread_id, _shutting_down
