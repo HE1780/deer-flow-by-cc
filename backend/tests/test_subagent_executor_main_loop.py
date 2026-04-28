@@ -79,12 +79,12 @@ def test_isolated_loop_pool_removed_from_module():
 
 def test_execute_routes_through_main_loop_when_registered():
     """When set_main_loop has registered a loop, execute() runs _aexecute on it."""
+    from deerflow.subagents.config import SubagentConfig
     from deerflow.subagents.executor import (
         SubagentExecutor,
         SubagentResult,
         SubagentStatus,
     )
-    from deerflow.subagents.config import SubagentConfig
 
     loop = asyncio.new_event_loop()
     t = _spin(loop)
@@ -123,12 +123,12 @@ def test_execute_routes_through_main_loop_when_registered():
 
 
 def test_execute_returns_failed_on_cancellation():
+    from deerflow.subagents.config import SubagentConfig
     from deerflow.subagents.executor import (
         SubagentExecutor,
         SubagentResult,
         SubagentStatus,
     )
-    from deerflow.subagents.config import SubagentConfig
 
     loop = asyncio.new_event_loop()
     t = _spin(loop)

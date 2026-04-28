@@ -2,7 +2,6 @@
 import asyncio
 import threading
 import time
-from unittest.mock import patch
 
 import pytest
 
