@@ -152,6 +152,29 @@ export interface Translations {
     agentCreated: string;
     startChatting: string;
     backToGallery: string;
+    edit: string;
+    editPageTitle: string;
+    editBasicSection: string;
+    editAdvancedSection: string;
+    editFieldDescription: string;
+    editFieldDescriptionPlaceholder: string;
+    editFieldModel: string;
+    editFieldModelDefault: string;
+    editFieldSoul: string;
+    editFieldSoulPlaceholder: string;
+    editFieldToolGroups: string;
+    editFieldSkills: string;
+    editFieldOrgKeyEnv: string;
+    editFieldOrgKeyEnvPlaceholder: string;
+    editUseAllToolGroups: string;
+    editUseAllSkills: string;
+    editSaveSuccess: string;
+    editSaveFailed: string;
+    editLoadFailed: string;
+    editLoadFailedBack: string;
+    editVersionPinned: string;
+    editToolGroupsLoadFailed: string;
+    editSkillsLoadFailed: string;
   };
 
   // Breadcrumb
