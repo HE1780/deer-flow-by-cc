@@ -63,6 +63,42 @@ def get_main_loop() -> asyncio.AbstractEventLoop:
     return _main_loop
 
 
+def submit_to_main_loop(coro_factory: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
+    """Submit a coroutine to the main loop and synchronously block on the result.
+
+    Args:
+        coro_factory: Zero-arg callable that returns a fresh coroutine when
+            called. We require a factory (not a coroutine instance) so the
+            coroutine is created on the worker thread immediately before
+            scheduling — avoiding any cross-thread mutation of an unstarted
+            coroutine object.
+
+    Returns:
+        Whatever the coroutine returns.
+
+    Raises:
+        RuntimeError: main loop is not registered, is shutting down, or this
+            call comes from the main-loop thread itself (would deadlock —
+            async callers should `await coro_factory()` directly).
+        concurrent.futures.CancelledError: shutdown cancelled the future.
+        Any exception raised by the coroutine.
+    """
+    if _main_loop is None:
+        raise RuntimeError("main loop is not registered")
+    if _shutting_down:
+        raise RuntimeError("main loop is shutting down")
+    if threading.get_ident() == _main_loop_thread_id:
+        raise RuntimeError(
+            "submit_to_main_loop called from main loop thread; "
+            "use 'await coro_factory()' instead"
+        )
+
+    coro = coro_factory()
+    future = asyncio.run_coroutine_threadsafe(coro, _main_loop)
+    _tracked_futures.add(future)
+    return future.result()
+
+
 def _reset_for_tests() -> None:
     """Wipe state. ONLY for unit tests; never call from product code."""
     global _main_loop, _main_loop_thread_id, _shutting_down

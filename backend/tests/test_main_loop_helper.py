@@ -57,3 +57,52 @@ def test_set_main_loop_rejects_conflicting_loop():
     finally:
         loop_a.close()
         loop_b.close()
+
+
+def _spin_loop_in_thread(loop: asyncio.AbstractEventLoop) -> threading.Thread:
+    """Run loop.run_forever() in a background thread; return the thread."""
+    t = threading.Thread(target=loop.run_forever, daemon=True)
+    t.start()
+    # Tiny wait so loop is actually running before tests submit work.
+    while not loop.is_running():
+        time.sleep(0.001)
+    return t
+
+
+def _stop_loop(loop: asyncio.AbstractEventLoop, t: threading.Thread) -> None:
+    loop.call_soon_threadsafe(loop.stop)
+    t.join(timeout=2)
+
+
+def test_submit_to_main_loop_returns_coroutine_result():
+    loop = asyncio.new_event_loop()
+    t = _spin_loop_in_thread(loop)
+    # Loop runs in thread `t`; main_loop_thread_id should match `t.ident`.
+    ml._main_loop = loop
+    ml._main_loop_thread_id = t.ident
+    try:
+        async def coro():
+            await asyncio.sleep(0)
+            return 42
+
+        result = ml.submit_to_main_loop(coro)
+        assert result == 42
+    finally:
+        _stop_loop(loop, t)
+        loop.close()
+
+
+def test_submit_to_main_loop_raises_when_loop_unset():
+    with pytest.raises(RuntimeError, match="main loop is not registered"):
+        ml.submit_to_main_loop(lambda: asyncio.sleep(0))
+
+
+def test_submit_from_main_loop_thread_raises_for_deadlock_safety():
+    loop = asyncio.new_event_loop()
+    ml._main_loop = loop
+    ml._main_loop_thread_id = threading.get_ident()  # Pretend we're on the main-loop thread.
+    try:
+        with pytest.raises(RuntimeError, match="from main loop thread"):
+            ml.submit_to_main_loop(lambda: asyncio.sleep(0))
+    finally:
+        loop.close()
