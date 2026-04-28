@@ -223,11 +223,25 @@ export function useThreadStream({
     },
     onLangChainEvent(event) {
       if (event.event === "on_tool_end") {
+        // [DEBUG: artifact-invalidation] Temporary diagnostic — see
+        // docs/superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md.
+        // Remove once event.data shape is confirmed.
+        console.debug("[artifact-invalidation] on_tool_end", {
+          name: event.name,
+          data: event.data,
+        });
+
         listeners.current.onToolEnd?.({
           name: event.name,
           data: event.data,
         });
         const mutatedPath = extractWriteFilePath(event.name, event.data);
+
+        console.debug("[artifact-invalidation] extractor result", {
+          toolName: event.name,
+          mutatedPath,
+        });
+
         if (mutatedPath) {
           // The agent just wrote/modified this file on disk. Invalidate the
           // cached artifact body so the side panel refetches the new content.
@@ -235,6 +249,11 @@ export function useThreadStream({
             queryKey: ["artifact", mutatedPath],
             exact: false,
           });
+
+          console.debug(
+            "[artifact-invalidation] invalidateQueries called",
+            ["artifact", mutatedPath],
+          );
         }
       }
     },
