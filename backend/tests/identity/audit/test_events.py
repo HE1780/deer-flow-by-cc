@@ -60,3 +60,10 @@ def test_is_critical_action_http_reads_not_critical():
     assert is_critical_action("some.read.action", http_method="GET") is False
     # Enumerated critical action on GET still critical (list wins).
     assert is_critical_action("user.login.success", http_method="GET") is True
+
+
+def test_llm_error_silenced_known_and_critical():
+    """LLM-error silencing must surface in audit so silent failures don't hide."""
+    assert "llm.error.silenced" in KNOWN_ACTIONS
+    assert "llm.error.silenced" in KEY_CRITICAL_ACTIONS
+    assert is_critical_action("llm.error.silenced") is True

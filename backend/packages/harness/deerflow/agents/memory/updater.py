@@ -1,7 +1,6 @@
 """Memory updater for reading, writing, and updating memory data."""
 
 import asyncio
-import atexit
 import concurrent.futures
 import copy
 import json
@@ -9,7 +8,7 @@ import logging
 import math
 import re
 import uuid
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from deerflow.agents.memory.prompt import (
@@ -23,14 +22,9 @@ from deerflow.agents.memory.storage import (
 )
 from deerflow.config.memory_config import get_memory_config
 from deerflow.models import create_chat_model
+from deerflow.runtime.main_loop import has_main_loop, submit_to_main_loop
 
 logger = logging.getLogger(__name__)
-
-_SYNC_MEMORY_UPDATER_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
-    max_workers=4,
-    thread_name_prefix="memory-updater-sync",
-)
-atexit.register(lambda: _SYNC_MEMORY_UPDATER_EXECUTOR.shutdown(wait=False))
 
 
 def _create_empty_memory() -> dict[str, Any]:
@@ -217,35 +211,34 @@ def _extract_text(content: Any) -> str:
     return str(content)
 
 
-def _run_async_update_sync(coro: Awaitable[bool]) -> bool:
-    """Run an async memory update from sync code, including nested-loop contexts."""
-    handed_off = False
+def _run_async_update_sync(coro_factory: Callable[[], Awaitable[bool]]) -> bool:
+    """Run an async memory update from sync code.
 
-    try:
+    When the Gateway has registered a main loop (Gateway mode), hand the
+    coroutine to that loop. Otherwise (Standard mode / tests without
+    lifespan) fall back to a fresh ephemeral loop via asyncio.run.
+
+    Args:
+        coro_factory: Zero-arg callable returning a fresh coroutine. The
+            factory is invoked exactly once on the executing thread.
+
+    Returns:
+        Whatever the coroutine returns, or False on cancellation / failure.
+    """
+    if has_main_loop():
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
+            return submit_to_main_loop(coro_factory)
+        except concurrent.futures.CancelledError:
+            logger.info("Memory update cancelled (main loop shutting down)")
+            return False
+        except Exception:
+            logger.exception("Memory update failed via main loop")
+            return False
 
-        if loop is not None and loop.is_running():
-            future = _SYNC_MEMORY_UPDATER_EXECUTOR.submit(asyncio.run, coro)
-            handed_off = True
-            return future.result()
-
-        handed_off = True
-        return asyncio.run(coro)
+    # Fallback: Standard mode / test harness without a registered main loop.
+    try:
+        return asyncio.run(coro_factory())
     except Exception:
-        if not handed_off:
-            close = getattr(coro, "close", None)
-            if callable(close):
-                try:
-                    close()
-                except Exception:
-                    logger.debug(
-                        "Failed to close un-awaited memory update coroutine",
-                        exc_info=True,
-                    )
-
         logger.exception("Failed to run async memory update from sync context")
         return False
 
@@ -445,7 +438,7 @@ class MemoryUpdater:
             True if update was successful, False otherwise.
         """
         return _run_async_update_sync(
-            self.aupdate_memory(
+            lambda: self.aupdate_memory(
                 messages=messages,
                 thread_id=thread_id,
                 agent_name=agent_name,

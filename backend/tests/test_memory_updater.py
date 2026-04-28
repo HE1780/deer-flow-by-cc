@@ -1,8 +1,6 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from deerflow.agents.memory.prompt import format_conversation_for_update
 from deerflow.agents.memory.updater import (
     MemoryUpdater,
@@ -650,7 +648,8 @@ class TestUpdateMemoryStructuredResponse:
         prompt = model.ainvoke.await_args.args[0]
         assert "Explicit correction signals were detected" not in prompt
 
-    def test_sync_update_memory_wrapper_works_in_running_loop(self):
+    def test_sync_update_memory_wrapper_works_without_main_loop(self):
+        """update_memory falls back to asyncio.run when no main loop is registered."""
         updater = MemoryUpdater()
         valid_json = '{"user": {}, "history": {}, "newFacts": [], "factsToRemove": []}'
         model = self._make_mock_model(valid_json)
@@ -660,6 +659,7 @@ class TestUpdateMemoryStructuredResponse:
             patch("deerflow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
             patch("deerflow.agents.memory.updater.get_memory_data", return_value=_make_memory()),
             patch("deerflow.agents.memory.updater.get_memory_storage", return_value=MagicMock(save=MagicMock(return_value=True))),
+            patch("deerflow.agents.memory.updater.has_main_loop", return_value=False),
         ):
             msg = MagicMock()
             msg.type = "human"
@@ -669,21 +669,20 @@ class TestUpdateMemoryStructuredResponse:
             ai_msg.content = "Hi"
             ai_msg.tool_calls = []
 
-            async def run_in_loop():
-                return updater.update_memory([msg, ai_msg])
-
-            result = asyncio.run(run_in_loop())
+            result = updater.update_memory([msg, ai_msg])
 
         assert result is True
         model.ainvoke.assert_awaited_once()
 
-    def test_sync_update_memory_returns_false_when_bridge_submit_fails(self):
+    def test_sync_update_memory_returns_false_when_main_loop_submit_fails(self):
+        """When submit_to_main_loop raises, update_memory returns False."""
         updater = MemoryUpdater()
 
         with (
+            patch("deerflow.agents.memory.updater.has_main_loop", return_value=True),
             patch(
-                "deerflow.agents.memory.updater._SYNC_MEMORY_UPDATER_EXECUTOR.submit",
-                side_effect=RuntimeError("executor down"),
+                "deerflow.agents.memory.updater.submit_to_main_loop",
+                side_effect=RuntimeError("main loop down"),
             ),
         ):
             msg = MagicMock()
@@ -694,41 +693,23 @@ class TestUpdateMemoryStructuredResponse:
             ai_msg.content = "Hi"
             ai_msg.tool_calls = []
 
-            async def run_in_loop():
-                return updater.update_memory([msg, ai_msg])
-
-            result = asyncio.run(run_in_loop())
+            result = updater.update_memory([msg, ai_msg])
 
         assert result is False
 
 
 class TestRunAsyncUpdateSync:
-    def test_closes_unawaited_awaitable_when_bridge_fails_before_handoff(self):
-        class CloseableAwaitable:
-            def __init__(self):
-                self.closed = False
+    def test_returns_false_when_fallback_coro_factory_raises(self):
+        """When the coro_factory raises in the fallback (no main loop) path,
+        _run_async_update_sync catches the exception and returns False."""
 
-            def __await__(self):
-                pytest.fail("awaitable should not have been awaited")
-                yield
+        def bad_factory():
+            raise RuntimeError("factory broken")
 
-            def close(self):
-                self.closed = True
-
-        awaitable = CloseableAwaitable()
-
-        with patch(
-            "deerflow.agents.memory.updater._SYNC_MEMORY_UPDATER_EXECUTOR.submit",
-            side_effect=RuntimeError("executor down"),
-        ):
-
-            async def run_in_loop():
-                return _run_async_update_sync(awaitable)
-
-            result = asyncio.run(run_in_loop())
+        with patch("deerflow.agents.memory.updater.has_main_loop", return_value=False):
+            result = _run_async_update_sync(bad_factory)
 
         assert result is False
-        assert awaitable.closed is True
 
 
 class TestFactDeduplicationCaseInsensitive:

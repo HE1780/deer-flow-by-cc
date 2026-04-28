@@ -433,22 +433,19 @@ class TestSyncExecutionPath:
         assert result.status == SubagentStatus.COMPLETED
         assert result.result == "Thread pool result"
 
-    @pytest.mark.anyio
-    async def test_execute_in_running_event_loop_uses_isolated_thread(self, classes, base_config, mock_agent, msg):
-        """Test that execute() uses the isolated-thread path inside a running loop."""
+    def test_execute_uses_asyncio_run_when_no_main_loop(self, classes, base_config, mock_agent, msg):
+        """Test that execute() falls back to asyncio.run when no main loop is registered."""
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
-        execution_threads = []
         final_state = {
             "messages": [
                 msg.human("Task"),
-                msg.ai("Async loop result", "msg-1"),
+                msg.ai("Fallback result", "msg-1"),
             ]
         }
 
         async def mock_astream(*args, **kwargs):
-            execution_threads.append(threading.current_thread().name)
             yield final_state
 
         mock_agent.astream = mock_astream
@@ -459,15 +456,15 @@ class TestSyncExecutionPath:
             thread_id="test-thread",
         )
 
-        with patch.object(executor, "_create_agent", return_value=mock_agent):
-            with patch.object(executor, "_execute_in_isolated_loop", wraps=executor._execute_in_isolated_loop) as isolated:
-                result = executor.execute("Task")
+        # Confirm no main loop is registered (standard mode / test environment)
+        from deerflow.runtime.main_loop import has_main_loop
+        assert not has_main_loop()
 
-        assert isolated.call_count == 1
-        assert execution_threads
-        assert all(name.startswith("subagent-isolated-") for name in execution_threads)
+        with patch.object(executor, "_create_agent", return_value=mock_agent):
+            result = executor.execute("Task")
+
         assert result.status == SubagentStatus.COMPLETED
-        assert result.result == "Async loop result"
+        assert result.result == "Fallback result"
 
     def test_execute_handles_asyncio_run_failure(self, classes, base_config):
         """Test handling when asyncio.run() itself fails."""
