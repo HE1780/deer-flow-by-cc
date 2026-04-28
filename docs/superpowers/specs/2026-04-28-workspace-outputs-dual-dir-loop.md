@@ -1,9 +1,11 @@
 # workspace/outputs 双目录设计触发 agent 死循环
 
-- **状态**:🟡 主因已修,残留前端 UI 刷新边角问题(2026-04-28)
-  - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main —— **首次编辑生效**;**第二次编辑残留**(见下)
+- **状态**:🟡 主因已修,前端 UI 刷新边角已两层下挖,**最新一层未 smoke 验证**(2026-04-28 晚)
+  - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main —— 但 onLangChainEvent 是死代码,**实际不工作**(见文末"晚间追查")
   - 分支 2 (prompt simplification — direct write to outputs):✅ 已合入 cc-main —— **死循环消除,模型不再崩溃**
   - 分支 3 (LoopDetection path-failure narrow detector):✅ 已合入 cc-main(7 新测试 + 50 老测试全绿)
+  - 分支 4 (messages-watcher invalidation,替换分支 1 的死代码):✅ 已合入 cc-main(commit `d67e0e13`,14 新测)
+  - 分支 5 (str_replace 切纯路径 URL,触发 HTTP fetch):✅ 已合入 cc-main(commit `b62d35bc`)—— **未 push,未 smoke 回归**
 
 ### 用户手工 smoke 反馈(2026-04-28)
 
@@ -167,3 +169,64 @@ LoopDetection 当前两层:
 - 新增 [frontend/src/core/artifacts/invalidation.ts](../../../frontend/src/core/artifacts/invalidation.ts)
 - 新增 [frontend/tests/unit/core/artifacts/invalidation.test.ts](../../../frontend/tests/unit/core/artifacts/invalidation.test.ts)
 - 修改 [frontend/src/core/threads/hooks.ts](../../../frontend/src/core/threads/hooks.ts)(import + onLangChainEvent 内调 invalidateQueries)
+
+---
+
+## 2026-04-28 (晚间) 主线追查:第二次编辑空白的真正根因
+
+### 时间线
+
+1. **第一波修复(已合入 cc-main)**:把 `onLangChainEvent` 内的 invalidate 写在 `extractWriteFilePath` 上,假设事件流会触发 invalidate。✅ 单元测试通过。
+2. **MCP smoke 验证**:在浏览器跑一遍 write_file → str_replace,**`__capturedWarns` 数组空**——`onLangChainEvent` 回调**根本没 fire**。
+3. **根因 #1(已修)**:[frontend/src/core/threads/hooks.ts:205-214](../../../frontend/src/core/threads/hooks.ts#L205-L214) 的 `useStream` 配置**没有传 `streamMode`**。LangGraph SDK 默认的 streamMode 不包括 `"events"`,所以 `on_tool_end` LangChain 事件根本不会被推到客户端。整个 `onLangChainEvent` 分支属于死代码——把它换成"watch `thread.messages`,看到新的 ToolMessage 就 invalidate"才是稳的实现。
+   - **修复 commit**: `d67e0e13` `fix(frontend): invalidate artifact cache via thread.messages, not events`
+   - 新增 `extractInvalidatedPathsFromNewMessages` + `extractToolEndEventsFromNewMessages`(共 14 个新单测);把 `useThreadStream` 改成 `useEffect` 监听 `thread.messages` 长度增长。
+   - **同时修复了 agents/new 页面的 `onToolEnd` 死回调**(它也依赖同一个事件流)——现在通过 messages-watcher 派发合成事件。
+4. **第二波 MCP smoke**:重跑 write_file → str_replace,**仍然空白**。但这次 `count: 0` 的不是 warn 数组,是 `/artifacts/` fetch 数组——也就是说 invalidate 调了,但**根本没人 refetch**。
+5. **根因 #2(刚修,未验证)**:看了 [frontend/src/components/workspace/messages/message-group.tsx:327-360](../../../frontend/src/components/workspace/messages/message-group.tsx#L327-L360) 和 [frontend/src/core/artifacts/loader.ts:26-47](../../../frontend/src/core/artifacts/loader.ts#L26-L47):
+   - 模型每次 `write_file` / `str_replace` 时,前端把 artifact viewer 的 URL 设成 `write-file:<path>?message_id=...&tool_call_id=...`(伪 URL scheme)。
+   - `useArtifactContent` 见到 `write-file:` 前缀就走 `loadArtifactContentFromToolCall`——直接读 AIMessage 的 `tool_call.args.content`,**不发 HTTP**。
+   - 对 `write_file` 这是合理的:`args` 里有完整 `content`,流式过程中文件还没落盘也能展示。
+   - 对 `str_replace` 这是**致命的**:`args = {path, old_str, new_str}`,**没有 `content` 字段**。函数返回 `undefined` → 面板渲染空。
+   - **修复 commit**: `b62d35bc` `fix(frontend): str_replace artifact viewer fetches from disk, not tool args`
+   - 改动只在 [message-group.tsx:327-372](../../../frontend/src/components/workspace/messages/message-group.tsx#L327-L372):`write_file` 仍走 `write-file:` URL,`str_replace` 改用纯路径 → 触发 `useArtifactContent` 的 HTTP 分支 → 与新的 messages-watcher invalidate 串起来,正好闭环。
+6. **未做的事**:**MCP smoke 还没回归 step 5 的修复**。merge 进 cc-main 但**没 push**。
+
+### 当前主分支状态(截至本会话结束)
+
+```
+git branch: cc-main (ahead of origin/cc-main by 2 commits)
+last 3 commits:
+  - Merge feat/artifact-str-replace-uses-plain-path (str_replace viewer fetches from disk)
+  - Merge feat/artifact-invalidation-via-messages (rewire artifact invalidation via thread.messages)
+  - <pre-existing>
+```
+
+### 给下一个会话的交班
+
+**目标**:验证 `b62d35bc` 是否真的解决"第二次编辑后 artifact 面板空白"。
+
+**复现路径**(用 `deerflow-web-testing` skill):
+1. 服务在 2026/3110/2024/8100,登录 `tsamilijohn206@gmail.com / ChangeMe!2026`
+2. 让模型创建一个 md(走 `write_file`)→ 验证 artifact 面板能显示
+3. 让模型用 `str_replace` 改这个 md → **关键验证点**:
+   - 面板自动切到新的 viewer(URL 应该是纯路径,不是 `write-file:...`)
+   - 面板内容应该是改后的版本
+   - 网络面板里能看到一个 `GET /api/threads/<id>/artifacts/<path>` 请求
+
+**如果验证失败,可能的下一层根因**:
+- (a) `select(buildUrl())` 调用时,`path` 字段在 str_replace 的 `args` 里命名不一致(可能是 `target_file` 等),需要改适配。验证方式:在 hooks.ts 的 messages-watcher 里临时加 console.warn 打 `tm.name + JSON.stringify(args)`。
+- (b) `useArtifactContent` 在 isMock=undefined 时 enabled 没传,query 不执行。看 hook 调用处。
+- (c) 第一次 write_file 的 `write-file:` URL 在新 ToolMessage 到来后没被 select 替换——也就是 `autoOpen && autoSelect && !result` 这几个 guard 在第二次工具完成时不再成立(`isLast` 跟新消息身份匹配吗?)。这是最有可能的——auto-open 那一层逻辑在第二轮可能根本不重新触发 select。
+
+**如果是 (c)**,修复方向应该是:在 messages-watcher 那边检测到新 ToolMessage 是 str_replace + 当前 selectedArtifact 是同 path 的 `write-file:` URL,主动把 selectedArtifact 切到纯路径(或者 invalidate `loadArtifactContentFromToolCall` 的源头——但那不是 react-query 管的)。
+
+**已知的清晰事实**(不要再去验证):
+- `onLangChainEvent` 不会 fire(deer-flow streamMode 不含 "events")——这是 D。
+- write_file 用 `write-file:` URL 是**正确**的,不要改。
+- str_replace 在 ToolMessage 内容是 "OK" / "Error: ..." 的简单字符串,新文件内容只在磁盘上。
+- 后端那条路径 `/api/threads/<id>/artifacts/<path>` 已经能正确返回最新内容(本次磁盘验证过 `第二版内容 v2`)。
+
+**还没做的小尾巴**:
+- `git push origin cc-main` ——push 之前先做完上面的 smoke。
+- 如果 (c) 是真的,记得把这一层根因 append 到本 spec,不要覆盖前面的诊断历史。
