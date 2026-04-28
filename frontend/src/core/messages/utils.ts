@@ -56,7 +56,10 @@ export function groupMessages<T>(
       continue;
     }
 
-    if (message.name === "todo_reminder") {
+    if (
+      message.name === "todo_reminder" ||
+      message.name === "todo_completion_reminder"
+    ) {
       continue;
     }
 
