@@ -126,6 +126,21 @@ A 方案大约 **20-40 行代码改动 + 2-3 个测试**。需要新建测试 fi
 - [ ] 跑回归测试
 - [ ] commit
 
+## 实施指引（2026-04-28 复核补充）
+
+下一个写 plan 的工程师可直接照下表落地，避免重新做 root-cause 调查：
+
+| 项 | 坐标 | 改动 |
+|---|---|---|
+| 文件 | `backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py` | 单文件改动 |
+| 导入 | line 25（当前只有 `HumanMessage`） | 追加 `RemoveMessage` from `langchain_core.messages` |
+| 主逻辑 | `_apply()` 方法的 hard_stop 分支（约 line 347-356）+ `_build_hard_stop_update`（约 line 327） | 提取被 strip 的 AIMessage 的 `tool_call_ids`，遍历 messages 历史找出对应孤儿 `ToolMessage`，返回 `[*RemoveMessage(id=...), stripped_msg]` 而非 `[stripped_msg]` |
+| 现有测试 | 同文件已有 `TestHardStopWithListContent`（约 line 354-415） | 参考其 `_make_state` fixture 模式新增 `TestHardStopOrphanRemoval` |
+| 反向 middleware | `DanglingToolCallMiddleware` 已处理"AI tool_call 没 ToolMessage"的反向场景 | 不要重复职责；本修复只补正向 |
+| 已在仓库证明可用 | `summarization_middleware.py` 已用 `RemoveMessage` | 无导入阻碍 |
+
+**预计**：~30 行编码 + ~50 行测试 + 1 处文档/changelog；2-4 小时 agentic 实施。
+
 ## 关联
 
 - 触发的"Console Error: Unexpected tool message outside a processing group" 在 [frontend/src/core/messages/utils.ts:83](../../../frontend/src/core/messages/utils.ts#L83) 也只是兜底，可以不动——root cause 修了它就不再出现

@@ -15,13 +15,13 @@ Conventions:
 | Plan | Scope | Status | Spec |
 |---|---|---|---|
 | [2026-04-25-agent-skill-version-pin](./2026-04-25-agent-skill-version-pin.md) | `name@version` skill pinning + `manifest.yaml` parser, auto-merge tool_groups + env at agent build | **open · actionable** — depends on agent-fix-i18n (shipped); not started | [skill-agent-i18n-design](../specs/archive/2026-04-25-skill-agent-i18n-design.md) (shared) |
-| [2026-04-27-custom-agent-edit-page](./2026-04-27-custom-agent-edit-page.md) | Backend agent CRUD + tool-groups endpoint + frontend edit form | **open · actionable** — TDD-level plan, ~42 steps unchecked | [custom-agent-edit-page-design](../specs/2026-04-27-custom-agent-edit-page-design.md) |
-| [2026-04-27-user-guide-implementation](./2026-04-27-user-guide-implementation.md) | 9-chapter end-user manual under `docs/user-guide/` with happy-path verification | **open · in-progress** — chapters 0-6 drafted; remaining chapters + screenshots pending | [user-guide-design](../specs/2026-04-27-user-guide-design.md) |
+| [2026-04-27-custom-agent-edit-page](./2026-04-27-custom-agent-edit-page.md) | Backend agent CRUD + tool-groups endpoint + frontend edit form | **open · actionable** — 2026-04-28 复核确认前端 UI/hook/i18n/test 全部未落地，backend 仅缺 `GET /api/tool-groups`；TDD-level plan ~10 个 task，预计 2-4h agentic | [custom-agent-edit-page-design](../specs/2026-04-27-custom-agent-edit-page-design.md) |
+| [2026-04-27-user-guide-implementation](./2026-04-27-user-guide-implementation.md) | 9-chapter end-user manual under `docs/user-guide/` with happy-path verification | **open · 内容完成 · 仅缺截图** — 9 章 + README ~599 行已实质完成；剩余仅 10+ 张截图补全 + 01-06 章 UI 改动后回访复核 | [user-guide-design](../specs/2026-04-27-user-guide-design.md) |
 
 Long-term / parking lot (no plan, but tracked elsewhere):
 
 - **Self-hosting epic** — docker-compose / Helm / offline images / install docs. No plan file yet; the next major epic. See memory `project_self_hosted_positioning.md`.
-- **P1 bug: LoopDetectionMiddleware orphan ToolMessage** — spec at [`../specs/2026-04-27-loop-detection-orphan-tool-msg.md`](../specs/2026-04-27-loop-detection-orphan-tool-msg.md); plan to be written.
+- **P1 bug: LoopDetectionMiddleware orphan ToolMessage** — spec at [`../specs/2026-04-27-loop-detection-orphan-tool-msg.md`](../specs/2026-04-27-loop-detection-orphan-tool-msg.md); plan to be written. spec 末尾"实施指引"块已给出文件:行号坐标 + 30 行编码 + 50 行测试的工作量估算，下一个写 plan 的工程师可直接拾取。
 
 ---
 

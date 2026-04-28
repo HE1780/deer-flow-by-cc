@@ -1,8 +1,9 @@
 # 自定义 Agent 编辑页设计
 
 - Date: 2026-04-27
-- Status: Draft (待用户复核)
+- Status: **open · actionable** — 设计已冻结，实施未启动（2026-04-28 复核：UI/hook/test 均未落地，backend 仅 PUT 字段已就绪，缺 `GET /api/tool-groups`）
 - Owner: cc-main
+- Companion plan: [../plans/2026-04-27-custom-agent-edit-page.md](../plans/2026-04-27-custom-agent-edit-page.md)（10 个 task，预计 2-4h agentic 实施 + 1h 验收）
 - Related code: `backend/app/gateway/routers/agents.py`, `frontend/src/components/workspace/agents/agent-card.tsx`, `frontend/src/app/workspace/agents/`, `frontend/src/core/agents/`
 
 ## 背景

@@ -11,9 +11,9 @@ A spec is the design artifact a [`plan`](../plans/) consumes. Most specs and pla
 | Spec | Scope | Status | Companion plan |
 |---|---|---|---|
 | [2026-04-21-deerflow-identity-foundation-design](./2026-04-21-deerflow-identity-foundation-design.md) | Multi-tenant identity, RBAC, storage isolation, LangGraph guardrail, audit. **Anchor doc for v2 enterprise identity.** | **kept · long-term reference** — P0 (M1-M7) shipped; remains the source of truth for v2 invariants and the entry point for P1 (fine-grained RBAC), P2 (KB), P3 (SkillHub), P4 (collab), P5 (workflow editor) | M1-M7 plans (all archived) |
-| [2026-04-27-custom-agent-edit-page-design](./2026-04-27-custom-agent-edit-page-design.md) | Agent edit form + tool-groups endpoint design | **open · actionable** — implementation plan exists, work not started | [custom-agent-edit-page](../plans/2026-04-27-custom-agent-edit-page.md) |
-| [2026-04-27-loop-detection-orphan-tool-msg](./2026-04-27-loop-detection-orphan-tool-msg.md) | P1 bug: `LoopDetectionMiddleware.hard_stop` clears `tool_calls` but leaves orphan `ToolMessage` history → MiniMax/Anthropic 400 on next call | **open · actionable** — P1 bug; fix deferred behind self-hosting epic | _none yet_ |
-| [2026-04-27-user-guide-design](./2026-04-27-user-guide-design.md) | 9-chapter user guide structure + role definitions + TOC | **open · in-progress** | [user-guide-implementation](../plans/2026-04-27-user-guide-implementation.md) |
+| [2026-04-27-custom-agent-edit-page-design](./2026-04-27-custom-agent-edit-page-design.md) | Agent edit form + tool-groups endpoint design | **open · actionable** — 2026-04-28 复核：UI/hook/test 全部未落地，backend 仅 PUT 字段就绪缺 `GET /api/tool-groups`；预计 2-4h 实施 | [custom-agent-edit-page](../plans/2026-04-27-custom-agent-edit-page.md) |
+| [2026-04-27-loop-detection-orphan-tool-msg](./2026-04-27-loop-detection-orphan-tool-msg.md) | P1 bug: `LoopDetectionMiddleware.hard_stop` clears `tool_calls` but leaves orphan `ToolMessage` history → MiniMax/Anthropic 400 on next call | **open · actionable** — spec 自带实施指引（坐标 + 工作量估算），可立即写 plan；优先级低于自托管 epic | _none yet — 见 spec 末尾"实施指引"块_ |
+| [2026-04-27-user-guide-design](./2026-04-27-user-guide-design.md) | 9-chapter user guide structure + role definitions + TOC | **open · 内容完成 · 仅缺截图** — 9 章正文 + README ~599 行已实质完成；剩余只有 10+ 张截图补全 + 01-06 章 UI 改动后回访复核 | [user-guide-implementation](../plans/2026-04-27-user-guide-implementation.md) |
 
 ---
 
