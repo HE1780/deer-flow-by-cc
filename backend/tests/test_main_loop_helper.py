@@ -155,3 +155,23 @@ def test_shutdown_cancels_in_flight_futures():
     finally:
         _stop_loop(loop, t)
         loop.close()
+
+
+def test_set_main_loop_replaces_closed_loop_after_full_lifecycle():
+    """Regression: a previously registered loop that has been shut down and
+    closed must not block registration of a fresh loop. Covers test harnesses
+    (and any future hot-reload scenario) that run multiple lifespans within
+    one process."""
+    loop_a = asyncio.new_event_loop()
+    ml.set_main_loop(loop_a)
+    asyncio.new_event_loop().run_until_complete(ml.shutdown_main_loop())
+    loop_a.close()
+    assert ml.has_main_loop() is False
+
+    loop_b = asyncio.new_event_loop()
+    try:
+        ml.set_main_loop(loop_b)  # must not raise
+        assert ml.get_main_loop() is loop_b
+        assert ml.has_main_loop() is True
+    finally:
+        loop_b.close()

@@ -41,18 +41,21 @@ def set_main_loop(loop: asyncio.AbstractEventLoop) -> None:
 
     Re-registering the same loop is a no-op. Registering a different loop
     while one is already active raises RuntimeError — production should
-    only have one main loop per process.
+    only have one main loop per process. A previously registered loop that
+    is now closed is treated as unregistered (covers test harnesses that
+    run multiple lifespans against the same process).
     """
-    global _main_loop, _main_loop_thread_id
+    global _main_loop, _main_loop_thread_id, _shutting_down
     with _lock:
         if _main_loop is loop:
             return
-        if _main_loop is not None:
+        if _main_loop is not None and not _main_loop.is_closed():
             raise RuntimeError(
                 "main loop is already registered; cannot replace at runtime"
             )
         _main_loop = loop
         _main_loop_thread_id = threading.get_ident()
+        _shutting_down = False
         logger.info("Main asyncio loop registered (thread_id=%s)", _main_loop_thread_id)
 
 
@@ -109,7 +112,8 @@ async def shutdown_main_loop() -> None:
     """
     global _main_loop, _main_loop_thread_id, _shutting_down
     with _lock:
-        if _shutting_down:
+        if _main_loop is None:
+            # Either already shut down, or never registered — nothing to do.
             return
         _shutting_down = True
     # Cancel all tracked futures. iterate over snapshot since the WeakSet
