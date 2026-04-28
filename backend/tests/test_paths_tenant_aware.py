@@ -162,3 +162,43 @@ class TestHostVariants:
         ]:
             method = getattr(paths, method_name)
             assert _as_posix(method("t1", tenant_id=5, workspace_id=7)).endswith(suffix)
+
+
+class TestDeleteThreadDirFor:
+    def test_removes_tenant_thread_dir_when_ids_present(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+        thread_dir = paths.tenant_thread_dir(5, 7, "thread-x")
+        thread_dir.mkdir(parents=True)
+        (thread_dir / "marker.txt").write_text("hi")
+        assert thread_dir.exists()
+
+        paths.delete_thread_dir_for("thread-x", tenant_id=5, workspace_id=7)
+
+        assert not thread_dir.exists()
+
+    def test_falls_back_to_legacy_thread_dir_when_ids_absent(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+        legacy = Path(tmp_path) / "threads" / "thread-y"
+        legacy.mkdir(parents=True)
+        (legacy / "marker.txt").write_text("hi")
+        assert legacy.exists()
+
+        paths.delete_thread_dir_for("thread-y")
+
+        assert not legacy.exists()
+
+    def test_idempotent_when_directory_absent(self, tmp_path):
+        paths = Paths(base_dir=str(tmp_path))
+        # Must not raise.
+        paths.delete_thread_dir_for("ghost", tenant_id=1, workspace_id=1)
+        paths.delete_thread_dir_for("ghost")  # legacy fallback path
+
+    def test_partial_ids_falls_back_to_legacy(self, tmp_path):
+        """workspace_id missing → legacy path used."""
+        paths = Paths(base_dir=str(tmp_path))
+        legacy = Path(tmp_path) / "threads" / "thread-p"
+        legacy.mkdir(parents=True)
+
+        paths.delete_thread_dir_for("thread-p", tenant_id=5, workspace_id=None)
+
+        assert not legacy.exists()

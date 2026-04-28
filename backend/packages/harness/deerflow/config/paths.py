@@ -274,6 +274,27 @@ class Paths:
         if thread_dir.exists():
             shutil.rmtree(thread_dir)
 
+    def delete_thread_dir_for(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: int | None = None,
+        workspace_id: int | None = None,
+    ) -> None:
+        """Tenant-aware thread-data deletion.
+
+        Mirrors :meth:`delete_thread_dir` (idempotent when the directory is
+        already absent), but routes through :meth:`resolve_thread_dir` so that
+        identity-aware callers physically remove the tenant-stratified
+        directory. Falls back to the legacy layout when either id is missing
+        or non-positive.
+        """
+        target = self.resolve_thread_dir(
+            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+        )
+        if target.exists():
+            shutil.rmtree(target)
+
     # ── Tenant-stratified paths (M4 storage isolation) ──────────────────
     #
     # The methods below layer tenant/workspace isolation on top of the legacy
