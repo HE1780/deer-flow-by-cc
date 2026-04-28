@@ -6,6 +6,7 @@ existing middleware suite; here we focus on the new identity-driven routing
 and the positive-int validation contract.
 """
 
+import warnings
 from pathlib import Path
 
 import pytest
@@ -202,9 +203,6 @@ class TestDeleteThreadDirFor:
         paths.delete_thread_dir_for("thread-p", tenant_id=5, workspace_id=None)
 
         assert not legacy.exists()
-
-
-import warnings
 
 
 class TestLegacyMethodDeprecation:
