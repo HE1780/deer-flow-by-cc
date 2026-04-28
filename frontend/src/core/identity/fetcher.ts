@@ -78,17 +78,30 @@ export async function identityFetch<T>(
   input: string,
   init?: RequestInit,
 ): Promise<T> {
+  const { _skipRefreshOn401, ...realInit } = (init ?? {}) as InternalInit;
+
   const resp = await fetch(input, {
     credentials: "include",
     headers: {
       accept: "application/json",
-      ...(init?.body ? { "content-type": "application/json" } : {}),
-      ...init?.headers,
+      ...(realInit.body ? { "content-type": "application/json" } : {}),
+      ...realInit.headers,
     },
-    ...init,
+    ...realInit,
   });
 
   if (resp.status === 401) {
+    if (_skipRefreshOn401) {
+      emitSessionExpired();
+      throw new IdentityFetchError({ kind: "unauthenticated" });
+    }
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return identityFetch<T>(input, {
+        ...init,
+        _skipRefreshOn401: true,
+      } as InternalInit);
+    }
     emitSessionExpired();
     throw new IdentityFetchError({ kind: "unauthenticated" });
   }
