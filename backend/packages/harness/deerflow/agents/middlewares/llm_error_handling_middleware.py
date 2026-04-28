@@ -256,6 +256,11 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     _extract_error_detail(exc),
                     exc_info=exc,
                 )
+                logger.critical(
+                    "LLM error silenced after %d attempt(s); returning user-facing fallback message",
+                    attempt,
+                    exc_info=exc,
+                )
                 if retriable:
                     self._record_failure()
                 return AIMessage(content=self._build_user_message(exc, reason))
@@ -300,6 +305,11 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     "LLM call failed after %d attempt(s): %s",
                     attempt,
                     _extract_error_detail(exc),
+                    exc_info=exc,
+                )
+                logger.critical(
+                    "LLM error silenced after %d attempt(s); returning user-facing fallback message",
+                    attempt,
                     exc_info=exc,
                 )
                 if retriable:
