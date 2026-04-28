@@ -638,6 +638,180 @@ class TestToolFrequencyDetection:
         assert _HARD_STOP_MSG in msg.content
 
 
+class TestPathFailureDetection:
+    """Layer 3: detect repeated *failures* of write_file / str_replace on the same path.
+
+    Motivation: when the agent writes a deliverable to one path but its
+    reasoning later assumes a different path, str_replace on the wrong
+    path keeps returning ``Error: ...`` for varying ``old_str`` / ``new_str``
+    arguments. Layer 1 (hash) and Layer 2 (per-tool frequency) both miss
+    this:
+
+    - Layer 1 intentionally hashes full args for write_file/str_replace
+      (so legitimate iterative editing is not flagged), so each retry
+      with different args produces a different hash.
+    - Layer 2's threshold (50 calls) is far higher than the typical
+      death-spiral length and lets the agent burn many turns first.
+
+    Layer 3 fires only when the same (tool_name, path) pair has produced
+    N consecutive ``Error: ...`` ToolMessages — which is exactly the
+    failure mode and very unlikely to happen on a healthy run.
+    """
+
+    def _ai_call(self, tool_name, path, call_id, **extra_args):
+        return AIMessage(
+            content="",
+            tool_calls=[{
+                "name": tool_name,
+                "id": call_id,
+                "args": {"path": path, **extra_args},
+            }],
+        )
+
+    def _tool_result(self, call_id, content):
+        return ToolMessage(content=content, tool_call_id=call_id)
+
+    def _build_history_with_failed_attempts(self, tool_name, path, failure_count, latest_call_id):
+        """Build a message history simulating ``failure_count`` past failed
+        attempts on (tool_name, path), followed by a fresh AIMessage that is
+        about to make the (failure_count + 1)-th attempt on the same path.
+        """
+        messages = []
+        for i in range(failure_count):
+            cid = f"call_fail_{i}"
+            messages.append(self._ai_call(tool_name, path, cid, old_str=f"v{i}", new_str=f"u{i}"))
+            messages.append(self._tool_result(cid, f"Error: file not found: {path}"))
+        # Latest AIMessage — this is the one loop detection runs on.
+        messages.append(self._ai_call(tool_name, path, latest_call_id, old_str="vN", new_str="uN"))
+        return {"messages": messages}
+
+    def test_no_warn_below_threshold(self):
+        """2 prior failures + 1 fresh call = 3 attempts, below default warn=3."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=4)
+        runtime = _make_runtime()
+
+        state = self._build_history_with_failed_attempts(
+            "str_replace", "/mnt/user-data/outputs/x.html",
+            failure_count=1, latest_call_id="call_latest",
+        )
+        result = mw._apply(state, runtime)
+        assert result is None
+
+    def test_warn_at_path_failure_threshold(self):
+        """3rd attempt on same (tool, path) after 2 prior failures -> warn."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=10)
+        runtime = _make_runtime()
+
+        state = self._build_history_with_failed_attempts(
+            "str_replace", "/mnt/user-data/outputs/x.html",
+            failure_count=2, latest_call_id="call_latest",
+        )
+        result = mw._apply(state, runtime)
+        assert result is not None
+        msg = result["messages"][0]
+        assert isinstance(msg, HumanMessage)
+        assert "LOOP DETECTED" in msg.content
+        # Mention the offending path so the model can self-correct.
+        assert "/mnt/user-data/outputs/x.html" in msg.content
+        assert "str_replace" in msg.content
+
+    def test_hard_stop_at_path_failure_limit(self):
+        """4th attempt with 3 prior failures triggers hard stop."""
+        mw = LoopDetectionMiddleware(path_failure_warn=2, path_failure_hard_limit=4)
+        runtime = _make_runtime()
+
+        state = self._build_history_with_failed_attempts(
+            "str_replace", "/mnt/user-data/outputs/x.html",
+            failure_count=3, latest_call_id="call_latest",
+        )
+        result = mw._apply(state, runtime)
+        assert result is not None
+        ai_msgs = [m for m in result["messages"] if isinstance(m, AIMessage)]
+        assert len(ai_msgs) == 1
+        assert ai_msgs[0].tool_calls == []
+        assert "FORCED STOP" in ai_msgs[0].content
+        assert "/mnt/user-data/outputs/x.html" in ai_msgs[0].content
+
+    def test_successful_tool_calls_reset_streak(self):
+        """A successful (non-Error) ToolMessage breaks the failure streak."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=4)
+        runtime = _make_runtime()
+
+        path = "/mnt/user-data/outputs/x.html"
+        messages = [
+            self._ai_call("str_replace", path, "c1", old_str="a", new_str="b"),
+            self._tool_result("c1", f"Error: file not found: {path}"),
+            self._ai_call("str_replace", path, "c2", old_str="a", new_str="b"),
+            self._tool_result("c2", f"Error: file not found: {path}"),
+            # Successful call mid-stream — should clear the streak
+            self._ai_call("str_replace", path, "c3", old_str="x", new_str="y"),
+            self._tool_result("c3", "OK"),
+            # Latest call: only 1 prior failure since the OK reset
+            self._ai_call("str_replace", path, "c_latest", old_str="z", new_str="w"),
+        ]
+        result = mw._apply({"messages": messages}, runtime)
+        assert result is None
+
+    def test_different_paths_tracked_independently(self):
+        """Failures on /a.html should not contaminate /b.html's counter."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=4)
+        runtime = _make_runtime()
+
+        messages = [
+            # 2 failures on /a.html
+            self._ai_call("str_replace", "/a.html", "ca1", old_str="x", new_str="y"),
+            self._tool_result("ca1", "Error: not found"),
+            self._ai_call("str_replace", "/a.html", "ca2", old_str="x", new_str="y"),
+            self._tool_result("ca2", "Error: not found"),
+            # Latest call is on /b.html — first attempt, no prior failures on /b.html
+            self._ai_call("str_replace", "/b.html", "cb1", old_str="x", new_str="y"),
+        ]
+        result = mw._apply({"messages": messages}, runtime)
+        assert result is None
+
+    def test_only_applies_to_write_file_and_str_replace(self):
+        """read_file failures are not part of this signature (cross-file
+        exploration after a missing target is legitimate)."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=4)
+        runtime = _make_runtime()
+
+        path = "/mnt/user-data/outputs/x.html"
+        messages = []
+        for i in range(3):
+            cid = f"cr{i}"
+            messages.append(AIMessage(
+                content="",
+                tool_calls=[{"name": "read_file", "id": cid, "args": {"path": path}}],
+            ))
+            messages.append(self._tool_result(cid, "Error: file not found"))
+        messages.append(AIMessage(
+            content="",
+            tool_calls=[{"name": "read_file", "id": "cr_latest", "args": {"path": path}}],
+        ))
+        result = mw._apply({"messages": messages}, runtime)
+        # Layer 3 should not fire on read_file. Layer 1/2 may also not fire
+        # under default thresholds — confirm: result is None.
+        assert result is None
+
+    def test_write_file_path_failure_also_detected(self):
+        """write_file path failures should be flagged the same as str_replace."""
+        mw = LoopDetectionMiddleware(path_failure_warn=3, path_failure_hard_limit=10)
+        runtime = _make_runtime()
+
+        path = "/mnt/user-data/outputs/x.html"
+        messages = [
+            self._ai_call("write_file", path, "cw1", content="v1"),
+            self._tool_result("cw1", f"Error: Permission denied writing to file: {path}"),
+            self._ai_call("write_file", path, "cw2", content="v2"),
+            self._tool_result("cw2", f"Error: Permission denied writing to file: {path}"),
+            self._ai_call("write_file", path, "cw_latest", content="v3"),
+        ]
+        result = mw._apply({"messages": messages}, runtime)
+        assert result is not None
+        assert "LOOP DETECTED" in result["messages"][0].content
+        assert "write_file" in result["messages"][0].content
+
+
 class TestHardStopOrphanToolMessageRemoval:
     """Hard stop must clean orphan ToolMessages whose tool_call_id matches
     the AIMessage being stripped. Otherwise strict providers (MiniMax/Anthropic)

@@ -1,9 +1,9 @@
 # workspace/outputs 双目录设计触发 agent 死循环
 
-- **状态**:🟢 主因修复中(分支 1+2 已落地,3 进行中)
+- **状态**:✅ 三分支已闭环(2026-04-28),等用户手工 smoke
   - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main
   - 分支 2 (prompt simplification — direct write to outputs):✅ 已合入 cc-main
-  - 分支 3 (LoopDetection path-failure narrow detector):🟡 进行中
+  - 分支 3 (LoopDetection path-failure narrow detector):✅ 已合入 cc-main(7 新测试 + 50 老测试全绿)
 - **日期**:2026-04-28
 - **影响**:任意"先生成产物 → 用户要求修改"的场景(HTML/MD/任何文档)。第二轮修改大概率触发反复重试直至撞 recursion 或 token 上限。
 
