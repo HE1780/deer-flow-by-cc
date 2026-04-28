@@ -26,6 +26,20 @@ Unit tests live under `tests/unit/` and mirror the `src/` layout (e.g., `tests/u
 
 E2E tests live under `tests/e2e/` and use Playwright with Chromium. They mock all backend APIs via `page.route()` network interception and test real page interactions (navigation, chat input, streaming responses). Config: `playwright.config.ts`.
 
+## git策略
+目前upstream/main 是上游官方基线（用于同步与对齐）， cc-main 是 origin 上的私有长期产品主线（承载日常开发与集成），通过“定期同步 upstream -> main，再择机合入 cc-main”保持可升级与自主演进。--需要择机优化
+
+## 分支操作约束
+1) 仅允许在 `feat/*` 分支修改代码。  
+2) `main` 只用于同步 `upstream`，不做功能开发。  
+3) 所有功能分支从 `cc-main` 创建，并合并回 `cc-main`。  
+4) 每次改动前先输出当前分支与 `git status -sb`。  
+5) 每个 `feat/*` 分支在“最小可用且测试通过”后，必须立即合并到 `cc-main` 并执行 `push origin cc-main`，不额外走 PR。  
+6) 只修改本任务相关目录；若涉及关键文件（锁文件、构建配置、部署配置），先暂停并询问我。  
+7) 提交前必须通过与本次改动相关的最小检查集：`lint`、`test`、`build`。  
+8) 每次提交必须小步、单一目的，并给出变更摘要与影响范围。  
+9) 禁止危险 Git 操作：`git reset --hard`、强制推送（`--force`）、删除分支。  
+
 ## Architecture
 
 ```
