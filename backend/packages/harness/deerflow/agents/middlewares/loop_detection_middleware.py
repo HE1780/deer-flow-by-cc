@@ -34,6 +34,13 @@ _DEFAULT_WINDOW_SIZE = 20  # track last N tool calls
 _DEFAULT_MAX_TRACKED_THREADS = 100  # LRU eviction limit
 _DEFAULT_TOOL_FREQ_WARN = 30  # warn after 30 calls to the same tool type
 _DEFAULT_TOOL_FREQ_HARD_LIMIT = 50  # force-stop after 50 calls to the same tool type
+_DEFAULT_PATH_FAILURE_WARN = 3  # warn after 3 consecutive (tool, path) failures
+_DEFAULT_PATH_FAILURE_HARD_LIMIT = 4  # force-stop after 4 consecutive (tool, path) failures
+
+# Tools subject to Layer 3 (path-failure) detection. Restricted to file
+# mutators because retrying a wrong path is exactly the failure mode and
+# legitimate retries should succeed within a couple of attempts.
+_PATH_FAILURE_TOOLS = frozenset({"write_file", "str_replace"})
 
 
 def _normalize_tool_call_args(raw_args: object) -> tuple[dict, str | None]:
@@ -132,9 +139,90 @@ _TOOL_FREQ_WARNING_MSG = (
     "[LOOP DETECTED] You have called {tool_name} {count} times without producing a final answer. Stop calling tools and produce your final answer now. If you cannot complete the task, summarize what you accomplished so far."
 )
 
+_PATH_FAILURE_WARNING_MSG = (
+    "[LOOP DETECTED] {tool_name} on `{path}` has failed {count} times in a row. "
+    "The path likely does not exist or cannot be modified. "
+    "Run `ls /mnt/user-data/outputs/` and `ls /mnt/user-data/workspace/` to verify "
+    "where the file actually lives, then retry on the correct path. "
+    "If you cannot recover, stop and summarize what you accomplished so far."
+)
+
 _HARD_STOP_MSG = "[FORCED STOP] Repeated tool calls exceeded the safety limit. Producing final answer with results collected so far."
 
 _TOOL_FREQ_HARD_STOP_MSG = "[FORCED STOP] Tool {tool_name} called {count} times — exceeded the per-tool safety limit. Producing final answer with results collected so far."
+
+_PATH_FAILURE_HARD_STOP_MSG = (
+    "[FORCED STOP] {tool_name} on `{path}` has failed {count} times in a row. "
+    "Aborting the loop. The deliverable was likely written elsewhere — "
+    "summarize the situation and ask the user to clarify the target path."
+)
+
+
+def _extract_tool_call_path(tool_call: dict) -> tuple[str, str | None]:
+    """Return ``(tool_name, path)`` from a tool_call dict.
+
+    Returns ``(tool_name, None)`` when the call is not a path-failure
+    candidate or its path cannot be resolved to a non-empty string.
+    """
+    name = tool_call.get("name", "")
+    if name not in _PATH_FAILURE_TOOLS:
+        return name, None
+    args, _ = _normalize_tool_call_args(tool_call.get("args", {}))
+    path = args.get("path")
+    if not isinstance(path, str):
+        return name, None
+    trimmed = path.strip()
+    return name, trimmed or None
+
+
+def _count_consecutive_path_failures(messages: list, tool_name: str, path: str) -> int:
+    """Count how many of the most recent ``(tool_name, path)`` calls in
+    history failed *consecutively*, scanning backward from the end.
+
+    A "call" is an AIMessage tool_call followed by its matching ToolMessage.
+    Failure = ToolMessage.content starts with ``"Error"``. The streak ends
+    at the first non-failure result, the first call on a different
+    ``(tool_name, path)`` pair, or the first call to a different tool.
+
+    The currently-pending AIMessage at ``messages[-1]`` is the trigger of
+    this check and is *not* counted — it is the "next attempt" the caller
+    is about to make.
+    """
+    streak = 0
+    # Scan from second-to-last message backward (skip the trigger AIMessage).
+    # Walk in pairs: (AIMessage with tool_call, ToolMessage with result).
+    idx = len(messages) - 2
+    while idx >= 0:
+        tool_msg = messages[idx]
+        if getattr(tool_msg, "type", None) != "tool":
+            break
+        # Find the AIMessage that produced this tool_call_id.
+        tool_call_id = getattr(tool_msg, "tool_call_id", None)
+        ai_idx = idx - 1
+        while ai_idx >= 0:
+            ai_msg = messages[ai_idx]
+            if getattr(ai_msg, "type", None) == "ai":
+                break
+            ai_idx -= 1
+        if ai_idx < 0:
+            break
+        ai_msg = messages[ai_idx]
+        ai_tool_calls = getattr(ai_msg, "tool_calls", None) or []
+        matching = next((tc for tc in ai_tool_calls if tc.get("id") == tool_call_id), None)
+        if matching is None:
+            break
+        m_name, m_path = _extract_tool_call_path(matching)
+        if m_name != tool_name or m_path != path:
+            break
+        # Same (tool, path). Now check if this attempt failed.
+        content = getattr(tool_msg, "content", "")
+        if not isinstance(content, str) or not content.startswith("Error"):
+            # A successful (or non-Error) result breaks the streak.
+            break
+        streak += 1
+        # Move to the pair before this AIMessage.
+        idx = ai_idx - 1
+    return streak
 
 
 class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
@@ -165,6 +253,8 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         max_tracked_threads: int = _DEFAULT_MAX_TRACKED_THREADS,
         tool_freq_warn: int = _DEFAULT_TOOL_FREQ_WARN,
         tool_freq_hard_limit: int = _DEFAULT_TOOL_FREQ_HARD_LIMIT,
+        path_failure_warn: int = _DEFAULT_PATH_FAILURE_WARN,
+        path_failure_hard_limit: int = _DEFAULT_PATH_FAILURE_HARD_LIMIT,
     ):
         super().__init__()
         self.warn_threshold = warn_threshold
@@ -173,6 +263,8 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         self.max_tracked_threads = max_tracked_threads
         self.tool_freq_warn = tool_freq_warn
         self.tool_freq_hard_limit = tool_freq_hard_limit
+        self.path_failure_warn = path_failure_warn
+        self.path_failure_hard_limit = path_failure_hard_limit
         self._lock = threading.Lock()
         # Per-thread tracking using OrderedDict for LRU eviction
         self._history: OrderedDict[str, list[str]] = OrderedDict()
@@ -180,6 +272,9 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         # Per-thread, per-tool-type cumulative call counts
         self._tool_freq: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self._tool_freq_warned: dict[str, set[str]] = defaultdict(set)
+        # Per-thread, per-(tool_name, path) "already warned" set so the
+        # path-failure warning only injects once per pair until success.
+        self._path_failure_warned: dict[str, set[tuple[str, str]]] = defaultdict(set)
 
     def _get_thread_id(self, runtime: Runtime) -> str:
         """Extract thread_id from runtime context for per-thread tracking."""
@@ -305,6 +400,56 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
                         )
                         return _TOOL_FREQ_WARNING_MSG.format(tool_name=name, count=tc_count), False
 
+            # --- Layer 3: per-(tool, path) consecutive-failure detection ---
+            # Catches the workspace/outputs edit-loop pattern: model keeps
+            # str_replace'ing the wrong path with varying args. Layer 1 misses
+            # this by design (full-args hashing avoids false positives on
+            # legitimate iterative editing). Layer 2's threshold is too high
+            # to catch a 4-call death spiral.
+            for tc in tool_calls:
+                tc_name, tc_path = _extract_tool_call_path(tc)
+                if tc_path is None:
+                    continue
+                prior_failures = _count_consecutive_path_failures(messages, tc_name, tc_path)
+                # The current attempt brings the total to prior_failures + 1.
+                attempt_count = prior_failures + 1
+                if attempt_count >= self.path_failure_hard_limit:
+                    logger.error(
+                        "Path-failure hard limit reached — forcing stop",
+                        extra={
+                            "thread_id": thread_id,
+                            "tool_name": tc_name,
+                            "path": tc_path,
+                            "attempt_count": attempt_count,
+                        },
+                    )
+                    return (
+                        _PATH_FAILURE_HARD_STOP_MSG.format(
+                            tool_name=tc_name, path=tc_path, count=attempt_count
+                        ),
+                        True,
+                    )
+                if attempt_count >= self.path_failure_warn:
+                    pair = (tc_name, tc_path)
+                    warned_pairs = self._path_failure_warned[thread_id]
+                    if pair not in warned_pairs:
+                        warned_pairs.add(pair)
+                        logger.warning(
+                            "Path-failure warning — repeated failures on same target",
+                            extra={
+                                "thread_id": thread_id,
+                                "tool_name": tc_name,
+                                "path": tc_path,
+                                "attempt_count": attempt_count,
+                            },
+                        )
+                        return (
+                            _PATH_FAILURE_WARNING_MSG.format(
+                                tool_name=tc_name, path=tc_path, count=attempt_count
+                            ),
+                            False,
+                        )
+
         return None, False
 
     @staticmethod
@@ -404,8 +549,10 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
                 self._warned.pop(thread_id, None)
                 self._tool_freq.pop(thread_id, None)
                 self._tool_freq_warned.pop(thread_id, None)
+                self._path_failure_warned.pop(thread_id, None)
             else:
                 self._history.clear()
                 self._warned.clear()
                 self._tool_freq.clear()
                 self._tool_freq_warned.clear()
+                self._path_failure_warned.clear()
