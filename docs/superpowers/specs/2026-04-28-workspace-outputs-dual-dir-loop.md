@@ -1,9 +1,22 @@
 # workspace/outputs 双目录设计触发 agent 死循环
 
-- **状态**:✅ 三分支已闭环(2026-04-28),等用户手工 smoke
-  - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main
-  - 分支 2 (prompt simplification — direct write to outputs):✅ 已合入 cc-main
+- **状态**:🟡 主因已修,残留前端 UI 刷新边角问题(2026-04-28)
+  - 分支 1 (frontend cache invalidation):✅ 已合入 cc-main —— **首次编辑生效**;**第二次编辑残留**(见下)
+  - 分支 2 (prompt simplification — direct write to outputs):✅ 已合入 cc-main —— **死循环消除,模型不再崩溃**
   - 分支 3 (LoopDetection path-failure narrow detector):✅ 已合入 cc-main(7 新测试 + 50 老测试全绿)
+
+### 用户手工 smoke 反馈(2026-04-28)
+
+- 第一次生成 MD:点链接 → artifact 面板正确显示 ✓
+- **第一次编辑**:点链接 → artifact 面板**正确显示更新内容** ✓ (分支 1 的 invalidate 在首次编辑时生效)
+- **第二次编辑**:artifact 面板**无变化**,**刷新页面后才更新** ❌
+
+**残留 bug 假设**:
+1. (a) `useArtifactContent` 在第一次编辑后某个 re-render 路径上 unmount 了,第二次 invalidate 时无 active observer → 只 mark stale,不触发 refetch,要等下次 mount(刷新)
+2. (b) React Query 的 staleTime/dedupe 把第二次 invalidate 当作"已经在更新中"忽略
+3. (c) 第二次 path 的 query key 形态跟第一次不严格匹配(`exact: false` 没救到),导致 invalidate 没命中正确 cache
+
+**待办**:用户继续 HTML 测试,在 Network 面板观察第二次编辑时是否有 artifact 请求被发出。Network 静默 → (a)/(c);Network 有请求但 UI 不变 → 渲染层问题。
 - **日期**:2026-04-28
 - **影响**:任意"先生成产物 → 用户要求修改"的场景(HTML/MD/任何文档)。第二轮修改大概率触发反复重试直至撞 recursion 或 token 上限。
 
