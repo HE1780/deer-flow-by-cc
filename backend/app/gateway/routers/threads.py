@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.gateway.deps import get_checkpointer, get_store
+from app.gateway.identity.request_scope import extract_scope
 from deerflow.config.paths import Paths, get_paths
 from deerflow.runtime import serialize_channel_values
 
@@ -145,11 +146,26 @@ class ThreadHistoryRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _delete_thread_data(thread_id: str, paths: Paths | None = None) -> ThreadDeleteResponse:
-    """Delete local persisted filesystem data for a thread."""
+def _delete_thread_data(
+    thread_id: str,
+    *,
+    tenant_id: int | None = None,
+    workspace_id: int | None = None,
+    paths: Paths | None = None,
+) -> ThreadDeleteResponse:
+    """Delete local persisted filesystem data for a thread.
+
+    When ``tenant_id`` and ``workspace_id`` are both supplied (M4 storage
+    isolation), the tenant-stratified directory is removed; otherwise the
+    legacy single-tenant layout is used. Anonymous / identity-off callers
+    pass ``None`` for both — same fallback semantics as ``uploads.py`` and
+    ``artifacts.py``.
+    """
     path_manager = paths or get_paths()
     try:
-        path_manager.delete_thread_dir_for(thread_id)
+        path_manager.delete_thread_dir_for(
+            thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError:
@@ -238,10 +254,16 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
     """Delete local persisted filesystem data for a thread.
 
     Cleans DeerFlow-managed thread directories, removes checkpoint data,
-    and removes the thread record from the Store.
+    and removes the thread record from the Store. Reads tenant identity from
+    ``request.state.identity`` (populated by ``IdentityMiddleware`` when the
+    feature flag is on) so identity-on threads physically remove the
+    tenant-stratified directory rather than no-op'ing on the legacy path.
     """
+    tenant_id, workspace_id = extract_scope(request)
     # Clean local filesystem
-    response = _delete_thread_data(thread_id)
+    response = _delete_thread_data(
+        thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+    )
 
     # Remove from Store (best-effort)
     store = get_store(request)

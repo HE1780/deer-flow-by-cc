@@ -107,3 +107,73 @@ def test_delete_thread_data_returns_generic_500_error(tmp_path):
     assert exc_info.value.detail == "Failed to delete local thread data."
     assert "/secret/path" not in exc_info.value.detail
     log_exception.assert_called_once_with("Failed to delete thread data for %s", "thread-cleanup")
+
+
+class TestDeleteThreadDataTenantAware:
+    def test_delete_removes_tenant_directory_when_identity_present(self, tmp_path):
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        tenant_dir = paths.tenant_thread_dir(1, 1, "thread-tenant")
+        tenant_dir.mkdir(parents=True)
+        (tenant_dir / "marker.txt").write_text("hi")
+
+        response = threads._delete_thread_data(
+            "thread-tenant",
+            tenant_id=1,
+            workspace_id=1,
+            paths=paths,
+        )
+
+        assert response.success is True
+        assert not tenant_dir.exists()
+
+    def test_delete_falls_back_to_legacy_when_anonymous(self, tmp_path):
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        legacy = tmp_path / "threads" / "thread-anon"
+        legacy.mkdir(parents=True)
+        (legacy / "marker.txt").write_text("x")
+
+        response = threads._delete_thread_data(
+            "thread-anon",
+            tenant_id=None,
+            workspace_id=None,
+            paths=paths,
+        )
+
+        assert response.success is True
+        assert not legacy.exists()
+
+    def test_delete_route_reads_identity_and_forwards(self, tmp_path):
+        """End-to-end via TestClient: route handler reads request.state.identity
+        and passes ids to _delete_thread_data."""
+        from types import SimpleNamespace
+
+        from deerflow.config.paths import Paths
+
+        paths = Paths(base_dir=str(tmp_path))
+        tenant_dir = paths.tenant_thread_dir(1, 1, "thread-route-t")
+        tenant_dir.mkdir(parents=True)
+
+        app = FastAPI()
+        app.include_router(threads.router)
+
+        @app.middleware("http")
+        async def _stub_identity(request, call_next):
+            request.state.identity = SimpleNamespace(
+                tenant_id=1, workspace_id=1, is_authenticated=True
+            )
+            return await call_next(request)
+
+        with (
+            patch("app.gateway.identity.request_scope.get_identity_settings") as ms,
+            patch("app.gateway.routers.threads.get_paths", return_value=paths),
+        ):
+            ms.return_value.enabled = True
+            with TestClient(app) as client:
+                response = client.delete("/api/threads/thread-route-t")
+
+        assert response.status_code == 200
+        assert not tenant_dir.exists()
