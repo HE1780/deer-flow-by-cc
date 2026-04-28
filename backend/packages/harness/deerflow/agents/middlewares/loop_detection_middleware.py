@@ -377,7 +377,14 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             # the conversation; injecting one mid-conversation crashes
             # langchain_anthropic's _format_messages(). HumanMessage works
             # with all providers. See #1299.
-            return {"messages": [HumanMessage(content=warning)]}
+            #
+            # Mark as hide_from_ui so the frontend's groupMessages() skips
+            # this system-injected message instead of creating a terminal
+            # "human" group that orphans subsequent ToolMessages.
+            return {"messages": [HumanMessage(
+                content=warning,
+                additional_kwargs={"hide_from_ui": True},
+            )]}
 
         return None
 

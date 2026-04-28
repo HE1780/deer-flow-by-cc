@@ -83,10 +83,15 @@ export function groupMessages<T>(
         if (open) {
           open.messages.push(message);
         } else {
-          console.error(
-            "Unexpected tool message outside a processing group",
-            message,
-          );
+          // Fallback: create a new processing group so the tool result is
+          // never dropped from the UI. This can happen when a system-injected
+          // HumanMessage (e.g. LoopDetection warning) interleaves the tool
+          // call chain and breaks the open-group continuity.
+          groups.push({
+            id: message.id,
+            type: "assistant:processing",
+            messages: [message],
+          });
         }
       }
       continue;
