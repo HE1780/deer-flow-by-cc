@@ -108,6 +108,8 @@ KNOWN_ACTIONS: frozenset[str] = frozenset(
         "system.retention.archived",
         # --- audit plane's own operations ---
         "audit.exported",
+        # --- LLM error observability ---
+        "llm.error.silenced",
     }
 )
 
@@ -124,6 +126,7 @@ KEY_CRITICAL_ACTIONS: frozenset[str] = frozenset(
         "authz.path.denied",
         "role.assigned",
         "role.revoked",
+        "llm.error.silenced",
     }
 )
 
