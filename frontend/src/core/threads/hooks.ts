@@ -8,7 +8,10 @@ import { toast } from "sonner";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
 import { getAPIClient } from "../api";
-import { extractWriteFilePath } from "../artifacts/invalidation";
+import {
+  extractInvalidatedPathsFromNewMessages,
+  extractToolEndEventsFromNewMessages,
+} from "../artifacts/invalidation";
 import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
 import type { FileInMessage } from "../messages/utils";
@@ -221,42 +224,6 @@ export function useThreadStream({
           .catch(() => ({}));
       }
     },
-    onLangChainEvent(event) {
-      if (event.event === "on_tool_end") {
-        // [DEBUG: artifact-invalidation] Temporary diagnostic — see
-        // docs/superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md.
-        // Remove once event.data shape is confirmed.
-        console.warn("[artifact-invalidation] on_tool_end", {
-          name: event.name,
-          data: event.data,
-        });
-
-        listeners.current.onToolEnd?.({
-          name: event.name,
-          data: event.data,
-        });
-        const mutatedPath = extractWriteFilePath(event.name, event.data);
-
-        console.warn("[artifact-invalidation] extractor result", {
-          toolName: event.name,
-          mutatedPath,
-        });
-
-        if (mutatedPath) {
-          // The agent just wrote/modified this file on disk. Invalidate the
-          // cached artifact body so the side panel refetches the new content.
-          void queryClient.invalidateQueries({
-            queryKey: ["artifact", mutatedPath],
-            exact: false,
-          });
-
-          console.warn(
-            "[artifact-invalidation] invalidateQueries called",
-            ["artifact", mutatedPath],
-          );
-        }
-      }
-    },
     onUpdateEvent(data) {
       const updates: Array<Partial<AgentThreadState> | null> = Object.values(
         data || {},
@@ -351,6 +318,39 @@ export function useThreadStream({
       setOptimisticMessages([]);
     }
   }, [thread.messages.length, optimisticMessages.length]);
+
+  // Watch thread.messages for newly-arrived ToolMessages so we can:
+  //   1. Invalidate artifact caches when write_file/str_replace finishes
+  //   2. Forward a tool-end event to the optional onToolEnd consumer
+  // The previous implementation relied on `onLangChainEvent`, but that
+  // callback never fires because deer-flow's useStream config does not
+  // include "events" in streamMode. Diagnosing via thread.messages is
+  // robust against that — messages-tuple stream is always enabled.
+  const prevMessagesRef = useRef<Message[]>([]);
+  useEffect(() => {
+    const before = prevMessagesRef.current;
+    const after = thread.messages;
+    if (after.length > before.length) {
+      const events = extractToolEndEventsFromNewMessages(before, after);
+      for (const event of events) {
+        listeners.current.onToolEnd?.(event);
+      }
+      const paths = extractInvalidatedPathsFromNewMessages(before, after);
+      for (const path of paths) {
+        void queryClient.invalidateQueries({
+          queryKey: ["artifact", path],
+          exact: false,
+        });
+      }
+    }
+    prevMessagesRef.current = after;
+  }, [thread.messages, queryClient]);
+
+  // Reset the messages baseline when switching threads so the watcher does
+  // not treat a thread's existing history as "new" arrivals.
+  useEffect(() => {
+    prevMessagesRef.current = [];
+  }, [threadId]);
 
   const sendMessage = useCallback(
     async (
