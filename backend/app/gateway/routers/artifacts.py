@@ -8,7 +8,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from app.gateway.identity.settings import get_identity_settings
+from app.gateway.identity.request_scope import extract_scope
 from app.gateway.identity.storage.path_guard import PathEscapeError, assert_within_tenant_root
 from app.gateway.path_utils import resolve_thread_virtual_path
 from deerflow.config.paths import get_paths
@@ -19,57 +19,9 @@ router = APIRouter(prefix="/api", tags=["artifacts"])
 
 
 def _extract_scope(request: Request | None) -> tuple[int | None, int | None]:
-    """Return ``(tenant_id, workspace_id)`` from ``request.state.identity``.
-
-    Only positive ints are accepted from both attribute and mapping shapes; any
-    other value (missing ``request``, flag off, anonymous identity, invalid
-    id types) falls back to ``(None, None)`` so the caller resolves through
-    the legacy path. The real production ``Identity`` dataclass exposes
-    ``tenant_id`` and ``workspace_ids`` (tuple); tests may inject a simple
-    namespace or dict that exposes ``workspace_id`` (singular) — both shapes
-    are supported here.
-    """
-    if request is None:
-        return None, None
-    if not get_identity_settings().enabled:
-        return None, None
-
-    identity = getattr(request.state, "identity", None)
-    if identity is None:
-        return None, None
-    # Respect the authenticated flag when present (production Identity).
-    if getattr(identity, "is_authenticated", True) is False:
-        return None, None
-
-    def _read(attr: str) -> object:
-        value = getattr(identity, attr, None)
-        if value is None and hasattr(identity, "get"):
-            try:
-                value = identity.get(attr)  # type: ignore[attr-defined]
-            except Exception:
-                value = None
-        return value
-
-    tid_raw = _read("tenant_id")
-    wid_raw = _read("workspace_id")
-    if wid_raw is None:
-        wids = _read("workspace_ids") or ()
-        if isinstance(wids, (list, tuple)) and wids:
-            wid_raw = wids[0]
-
-    def _coerce(value: object) -> int | None:
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            return None
-        return value
-
-    tid = _coerce(tid_raw)
-    wid = _coerce(wid_raw)
-    # All-or-nothing: if either id is missing/invalid, fall back to legacy.
-    # Keeps downstream callers from accidentally mixing a real tenant id with
-    # an unresolved workspace slot.
-    if tid is None or wid is None:
-        return None, None
-    return tid, wid
+    """Backward-compat alias retained for in-file callers; delegates to the
+    shared :func:`app.gateway.identity.request_scope.extract_scope`."""
+    return extract_scope(request)
 
 
 ACTIVE_CONTENT_MIME_TYPES = {

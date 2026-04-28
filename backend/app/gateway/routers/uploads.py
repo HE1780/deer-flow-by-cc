@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 
-from app.gateway.identity.settings import get_identity_settings
+from app.gateway.identity.request_scope import extract_scope
 from app.gateway.identity.storage.path_guard import PathEscapeError, assert_within_tenant_root
 from deerflow.config.app_config import get_app_config
 from deerflow.config.paths import get_paths
@@ -32,51 +32,9 @@ router = APIRouter(prefix="/api/threads/{thread_id}/uploads", tags=["uploads"])
 
 
 def _extract_scope(request: Request | None) -> tuple[int | None, int | None]:
-    """Return ``(tenant_id, workspace_id)`` from ``request.state.identity``.
-
-    Mirrors the helper in ``artifacts.py``: only positive ints pass through;
-    when the identity flag is off, the caller is anonymous, the ids are
-    missing, or *request* is absent (direct unit-test invocation), both slots
-    are ``None`` and the router resolves via the legacy single-tenant layout.
-    """
-    if request is None:
-        return None, None
-    if not get_identity_settings().enabled:
-        return None, None
-
-    identity = getattr(request.state, "identity", None)
-    if identity is None:
-        return None, None
-    if getattr(identity, "is_authenticated", True) is False:
-        return None, None
-
-    def _read(attr: str) -> object:
-        value = getattr(identity, attr, None)
-        if value is None and hasattr(identity, "get"):
-            try:
-                value = identity.get(attr)  # type: ignore[attr-defined]
-            except Exception:
-                value = None
-        return value
-
-    tid_raw = _read("tenant_id")
-    wid_raw = _read("workspace_id")
-    if wid_raw is None:
-        wids = _read("workspace_ids") or ()
-        if isinstance(wids, (list, tuple)) and wids:
-            wid_raw = wids[0]
-
-    def _coerce(value: object) -> int | None:
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            return None
-        return value
-
-    tid = _coerce(tid_raw)
-    wid = _coerce(wid_raw)
-    # All-or-nothing: if either id is missing/invalid, fall back to legacy.
-    if tid is None or wid is None:
-        return None, None
-    return tid, wid
+    """Backward-compat alias retained for in-file callers; delegates to the
+    shared :func:`app.gateway.identity.request_scope.extract_scope`."""
+    return extract_scope(request)
 
 
 def _guard_uploads_dir(uploads_dir: Path, thread_id: str, tid: int | None) -> None:
