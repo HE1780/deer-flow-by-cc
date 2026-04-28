@@ -470,3 +470,74 @@ class TestBeforeAgent:
         content = result["messages"][-1].content
         assert "Document outline" not in content
         assert "grep" in content
+
+
+class TestTenantAwarePathResolution:
+    """When state['identity'] carries valid tenant ids, the middleware reads
+    from tenants/{tid}/workspaces/{wid}/threads/{tid}/user-data/uploads/, not
+    the legacy {base_dir}/threads/.../user-data/uploads/."""
+
+    def test_before_agent_reads_from_tenant_path_when_identity_present(self, tmp_path):
+        from types import SimpleNamespace
+
+        mw = _middleware(tmp_path)
+        # Tenant-stratified uploads dir with a real file.
+        tenant_uploads = mw._paths.resolve_sandbox_uploads_dir(
+            THREAD_ID, tenant_id=1, workspace_id=1
+        )
+        tenant_uploads.mkdir(parents=True, exist_ok=True)
+        (tenant_uploads / "财务数据.csv").write_text("a,b,c", encoding="utf-8")
+
+        # Legacy path is intentionally NOT created.
+        assert not (Path(tmp_path) / "threads" / THREAD_ID / "user-data" / "uploads").exists()
+
+        msg = _human("分析这个数据")
+        state = {
+            "messages": [msg],
+            "identity": SimpleNamespace(tenant_id=1, workspace_id=1),
+        }
+        runtime = _runtime(thread_id=THREAD_ID)
+
+        result = mw.before_agent(state, runtime)
+
+        assert result is not None, "middleware must return a state update when files exist"
+        updated_msg = result["messages"][-1]
+        assert "<uploaded_files>" in updated_msg.content
+        assert "财务数据.csv" in updated_msg.content
+
+    def test_before_agent_falls_back_to_legacy_without_identity(self, tmp_path):
+        """Sanity: existing legacy behaviour preserved when state['identity'] is absent."""
+        mw = _middleware(tmp_path)
+        legacy_uploads = Path(tmp_path) / "threads" / THREAD_ID / "user-data" / "uploads"
+        legacy_uploads.mkdir(parents=True)
+        (legacy_uploads / "legacy.csv").write_text("x", encoding="utf-8")
+
+        msg = _human("hi")
+        state = {"messages": [msg]}  # no identity
+        runtime = _runtime(thread_id=THREAD_ID)
+
+        result = mw.before_agent(state, runtime)
+
+        assert result is not None
+        assert "legacy.csv" in result["messages"][-1].content
+
+    def test_before_agent_falls_back_to_legacy_with_invalid_identity(self, tmp_path):
+        """Non-positive ids fall through to legacy."""
+        from types import SimpleNamespace
+
+        mw = _middleware(tmp_path)
+        legacy_uploads = Path(tmp_path) / "threads" / THREAD_ID / "user-data" / "uploads"
+        legacy_uploads.mkdir(parents=True)
+        (legacy_uploads / "legacy.csv").write_text("x", encoding="utf-8")
+
+        msg = _human("hi")
+        state = {
+            "messages": [msg],
+            "identity": SimpleNamespace(tenant_id=0, workspace_id=1),  # tenant_id invalid
+        }
+        runtime = _runtime(thread_id=THREAD_ID)
+
+        result = mw.before_agent(state, runtime)
+
+        assert result is not None
+        assert "legacy.csv" in result["messages"][-1].content

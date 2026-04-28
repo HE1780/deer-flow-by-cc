@@ -2,13 +2,14 @@
 
 import logging
 from pathlib import Path
-from typing import NotRequired, override
+from typing import Any, NotRequired, override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import HumanMessage
 from langgraph.runtime import Runtime
 
+from deerflow.agents.middlewares._identity import extract_tenant_ids
 from deerflow.config.paths import Paths, get_paths
 from deerflow.utils.file_conversion import extract_outline
 
@@ -57,9 +58,19 @@ def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
 
 
 class UploadsMiddlewareState(AgentState):
-    """State schema for uploads middleware."""
+    """State schema for uploads middleware.
+
+    The ``identity`` field carries tenant/workspace context forwarded by the
+    Gateway (set by the M5 IdentityMiddleware at chain position 0). Typed as
+    an opaque ``Any`` to keep the harness/app boundary clean — the production
+    ``Identity`` dataclass lives in ``app.gateway.identity.auth`` and the
+    harness must not import it. Reading is delegated to
+    :func:`deerflow.agents.middlewares._identity.extract_tenant_ids` which
+    handles dataclass / SimpleNamespace / dict shapes defensively.
+    """
 
     uploaded_files: NotRequired[list[dict] | None]
+    identity: NotRequired[Any]
 
 
 class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
@@ -221,7 +232,17 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
                 thread_id = get_config().get("configurable", {}).get("thread_id")
             except RuntimeError:
                 pass  # get_config() raises outside a runnable context (e.g. unit tests)
-        uploads_dir = self._paths.resolve_sandbox_uploads_dir(thread_id) if thread_id else None
+        # Read identity defensively (mirrors ThreadDataMiddleware). Falls back
+        # to legacy single-tenant layout when ids are absent or non-positive.
+        identity = state.get("identity") if hasattr(state, "get") else None
+        tenant_id, workspace_id = extract_tenant_ids(identity)
+        uploads_dir = (
+            self._paths.resolve_sandbox_uploads_dir(
+                thread_id, tenant_id=tenant_id, workspace_id=workspace_id
+            )
+            if thread_id
+            else None
+        )
 
         # Get newly uploaded files from the current message's additional_kwargs.files
         new_files = self._files_from_kwargs(last_message, uploads_dir) or []
