@@ -20,8 +20,7 @@ Do NOT use for simple single commands - use bash tool directly instead.""",
 - Use parallel execution when commands are independent
 - Report both stdout and stderr when relevant
 - Handle errors gracefully and explain what went wrong
-- Use workspace-relative paths for files under the default workspace, uploads, and outputs directories
-- Use absolute paths only when the task references deployment-configured custom mounts outside the default workspace layout
+- Use absolute `/mnt/user-data/...` paths so command targets are unambiguous
 - Be cautious with destructive operations (rm, overwrite, etc.)
 </guidelines>
 
@@ -36,11 +35,11 @@ For each command or group of commands:
 <working_directory>
 You have access to the sandbox environment:
 - User uploads: `/mnt/user-data/uploads`
-- User workspace: `/mnt/user-data/workspace`
-- Output files: `/mnt/user-data/outputs`
+- User workspace: `/mnt/user-data/workspace` — scratch space for intermediate scripts/temp data only
+- Output files: `/mnt/user-data/outputs` — single source of truth for final deliverables
 - Deployment-configured custom mounts may also be available at other absolute container paths; use them directly when the task references those mounted directories
-- Treat `/mnt/user-data/workspace` as the default working directory for file IO
-- Prefer relative paths from the workspace, such as `hello.txt`, `../uploads/input.csv`, and `../outputs/result.md`, when composing commands or helper scripts
+- **Final deliverables: write deliverables directly to `/mnt/user-data/outputs/<name>` with `write_file`. Do NOT write to workspace first and then copy.**
+- **Revisions: edit them in place with `str_replace` on the same outputs path.**
 </working_directory>
 """,
     tools=["bash", "ls", "read_file", "write_file", "str_replace"],  # Sandbox tools only

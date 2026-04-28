@@ -43,15 +43,21 @@ def test_build_subagent_section_includes_bash_when_available(monkeypatch) -> Non
     assert "available tools (bash, ls, read_file, web_search, etc.)" in section
 
 
-def test_bash_subagent_prompt_mentions_workspace_relative_paths() -> None:
+def test_bash_subagent_prompt_directs_deliverables_to_outputs() -> None:
+    """See test_lead_agent_prompt.test_apply_prompt_template_directs_deliverables_to_outputs."""
     from deerflow.subagents.builtins.bash_agent import BASH_AGENT_CONFIG
 
-    assert "Treat `/mnt/user-data/workspace` as the default working directory for file IO" in BASH_AGENT_CONFIG.system_prompt
-    assert "`hello.txt`, `../uploads/input.csv`, and `../outputs/result.md`" in BASH_AGENT_CONFIG.system_prompt
+    prompt = BASH_AGENT_CONFIG.system_prompt
+    assert "write deliverables directly to `/mnt/user-data/outputs/" in prompt
+    assert "edit them in place with `str_replace`" in prompt
+    assert "Treat `/mnt/user-data/workspace` as the default working directory" not in prompt
 
 
-def test_general_purpose_subagent_prompt_mentions_workspace_relative_paths() -> None:
+def test_general_purpose_subagent_prompt_directs_deliverables_to_outputs() -> None:
+    """See test_lead_agent_prompt.test_apply_prompt_template_directs_deliverables_to_outputs."""
     from deerflow.subagents.builtins.general_purpose import GENERAL_PURPOSE_CONFIG
 
-    assert "Treat `/mnt/user-data/workspace` as the default working directory for coding and file IO" in GENERAL_PURPOSE_CONFIG.system_prompt
-    assert "`hello.txt`, `../uploads/input.csv`, and `../outputs/result.md`" in GENERAL_PURPOSE_CONFIG.system_prompt
+    prompt = GENERAL_PURPOSE_CONFIG.system_prompt
+    assert "write deliverables directly to `/mnt/user-data/outputs/" in prompt
+    assert "edit them in place with `str_replace`" in prompt
+    assert "Treat `/mnt/user-data/workspace` as the default working directory" not in prompt
