@@ -10,10 +10,10 @@ from deerflow.config.paths import Paths
 
 def test_delete_thread_data_removes_thread_directory(tmp_path):
     paths = Paths(tmp_path)
-    thread_dir = paths.thread_dir("thread-cleanup")
-    workspace = paths.sandbox_work_dir("thread-cleanup")
-    uploads = paths.sandbox_uploads_dir("thread-cleanup")
-    outputs = paths.sandbox_outputs_dir("thread-cleanup")
+    thread_dir = paths.resolve_thread_dir("thread-cleanup")
+    workspace = paths.resolve_sandbox_work_dir("thread-cleanup")
+    uploads = paths.resolve_sandbox_uploads_dir("thread-cleanup")
+    outputs = paths.resolve_sandbox_outputs_dir("thread-cleanup")
 
     for directory in [workspace, uploads, outputs]:
         directory.mkdir(parents=True, exist_ok=True)
@@ -35,7 +35,7 @@ def test_delete_thread_data_is_idempotent_for_missing_directory(tmp_path):
     response = threads._delete_thread_data("missing-thread", paths=paths)
 
     assert response.success is True
-    assert not paths.thread_dir("missing-thread").exists()
+    assert not paths.resolve_thread_dir("missing-thread").exists()
 
 
 def test_delete_thread_data_rejects_invalid_thread_id(tmp_path):
@@ -50,9 +50,9 @@ def test_delete_thread_data_rejects_invalid_thread_id(tmp_path):
 
 def test_delete_thread_route_cleans_thread_directory(tmp_path):
     paths = Paths(tmp_path)
-    thread_dir = paths.thread_dir("thread-route")
-    paths.sandbox_work_dir("thread-route").mkdir(parents=True, exist_ok=True)
-    (paths.sandbox_work_dir("thread-route") / "notes.txt").write_text("hello", encoding="utf-8")
+    thread_dir = paths.resolve_thread_dir("thread-route")
+    paths.resolve_sandbox_work_dir("thread-route").mkdir(parents=True, exist_ok=True)
+    (paths.resolve_sandbox_work_dir("thread-route") / "notes.txt").write_text("hello", encoding="utf-8")
 
     app = FastAPI()
     app.include_router(threads.router)
@@ -97,7 +97,7 @@ def test_delete_thread_data_returns_generic_500_error(tmp_path):
     paths = Paths(tmp_path)
 
     with (
-        patch.object(paths, "delete_thread_dir", side_effect=OSError("/secret/path")),
+        patch.object(paths, "delete_thread_dir_for", side_effect=OSError("/secret/path")),
         patch.object(threads.logger, "exception") as log_exception,
     ):
         with pytest.raises(HTTPException) as exc_info:

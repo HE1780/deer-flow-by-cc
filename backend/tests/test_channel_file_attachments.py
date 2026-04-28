@@ -113,7 +113,7 @@ class TestResolveAttachments:
 
         mock_paths = MagicMock()
         mock_paths.resolve_virtual_path.return_value = test_file
-        mock_paths.sandbox_outputs_dir.return_value = outputs_dir
+        mock_paths.resolve_sandbox_outputs_dir.return_value = outputs_dir
 
         with patch("deerflow.config.paths.get_paths", return_value=mock_paths):
             result = _resolve_attachments(thread_id, ["/mnt/user-data/outputs/report.pdf"])
@@ -136,7 +136,7 @@ class TestResolveAttachments:
 
         mock_paths = MagicMock()
         mock_paths.resolve_virtual_path.return_value = img
-        mock_paths.sandbox_outputs_dir.return_value = outputs_dir
+        mock_paths.resolve_sandbox_outputs_dir.return_value = outputs_dir
 
         with patch("deerflow.config.paths.get_paths", return_value=mock_paths):
             result = _resolve_attachments(thread_id, ["/mnt/user-data/outputs/chart.png"])
@@ -154,7 +154,7 @@ class TestResolveAttachments:
 
         mock_paths = MagicMock()
         mock_paths.resolve_virtual_path.return_value = outputs_dir / "nonexistent.txt"
-        mock_paths.sandbox_outputs_dir.return_value = outputs_dir
+        mock_paths.resolve_sandbox_outputs_dir.return_value = outputs_dir
 
         with patch("deerflow.config.paths.get_paths", return_value=mock_paths):
             result = _resolve_attachments("t1", ["/mnt/user-data/outputs/nonexistent.txt"])
@@ -211,7 +211,7 @@ class TestResolveAttachments:
 
         mock_paths = MagicMock()
         mock_paths.resolve_virtual_path.return_value = escaped_file
-        mock_paths.sandbox_outputs_dir.return_value = outputs_dir
+        mock_paths.resolve_sandbox_outputs_dir.return_value = outputs_dir
 
         with patch("deerflow.config.paths.get_paths", return_value=mock_paths):
             result = _resolve_attachments(thread_id, ["/mnt/user-data/outputs/../uploads/stolen.txt"])
@@ -229,7 +229,7 @@ class TestResolveAttachments:
         good_file.write_text("a,b,c")
 
         mock_paths = MagicMock()
-        mock_paths.sandbox_outputs_dir.return_value = outputs_dir
+        mock_paths.resolve_sandbox_outputs_dir.return_value = outputs_dir
 
         def resolve_side_effect(tid, vpath, *, tenant_id=None, workspace_id=None):
             if "data.csv" in vpath:

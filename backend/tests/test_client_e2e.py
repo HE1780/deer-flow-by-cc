@@ -263,7 +263,7 @@ class TestFileUploadIntegration:
         # Physically exists
         from deerflow.config.paths import get_paths
 
-        assert (get_paths().sandbox_uploads_dir(tid) / "readme.txt").exists()
+        assert (get_paths().resolve_sandbox_uploads_dir(tid) / "readme.txt").exists()
 
     def test_upload_duplicate_rename(self, e2e_env, tmp_path):
         """Uploading two files with the same name auto-renames the second."""
@@ -400,7 +400,7 @@ class TestMiddlewareChain:
         # We verify the paths singleton can resolve the thread dir.
         from deerflow.config.paths import get_paths
 
-        thread_dir = get_paths().thread_dir(tid)
+        thread_dir = get_paths().resolve_thread_dir(tid)
         assert str(thread_dir).endswith(tid)
 
     @requires_llm
@@ -477,7 +477,7 @@ class TestArtifactAccess:
         tid = str(uuid.uuid4())
 
         # Create an output file in the thread's outputs directory
-        outputs_dir = get_paths().sandbox_outputs_dir(tid)
+        outputs_dir = get_paths().resolve_sandbox_outputs_dir(tid)
         outputs_dir.mkdir(parents=True, exist_ok=True)
         (outputs_dir / "result.txt").write_text("hello artifact")
 
@@ -492,7 +492,7 @@ class TestArtifactAccess:
         c = DeerFlowClient(checkpointer=None, thinking_enabled=False)
         tid = str(uuid.uuid4())
 
-        outputs_dir = get_paths().sandbox_outputs_dir(tid)
+        outputs_dir = get_paths().resolve_sandbox_outputs_dir(tid)
         sub = outputs_dir / "charts"
         sub.mkdir(parents=True, exist_ok=True)
         (sub / "data.json").write_text('{"x": 1}')

@@ -344,8 +344,8 @@ class FeishuChannel(Channel):
             return f"Failed to obtain the [{type}]"
 
         paths = get_paths()
-        paths.ensure_thread_dirs(thread_id)
-        uploads_dir = paths.sandbox_uploads_dir(thread_id).resolve()
+        paths.ensure_thread_dirs_for(thread_id)
+        uploads_dir = paths.resolve_sandbox_uploads_dir(thread_id).resolve()
 
         ext = "png" if type == "image" else "bin"
         raw_filename = getattr(response, "file_name", "") or f"feishu_{file_key[-12:]}.{ext}"

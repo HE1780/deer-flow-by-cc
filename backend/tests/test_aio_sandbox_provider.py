@@ -13,7 +13,7 @@ from deerflow.config.paths import Paths, join_host_path
 def test_ensure_thread_dirs_creates_acp_workspace(tmp_path):
     """ACP workspace directory must be created alongside user-data dirs."""
     paths = Paths(base_dir=tmp_path)
-    paths.ensure_thread_dirs("thread-1")
+    paths.ensure_thread_dirs_for("thread-1")
 
     assert (tmp_path / "threads" / "thread-1" / "user-data" / "workspace").exists()
     assert (tmp_path / "threads" / "thread-1" / "user-data" / "uploads").exists()
@@ -24,7 +24,7 @@ def test_ensure_thread_dirs_creates_acp_workspace(tmp_path):
 def test_ensure_thread_dirs_acp_workspace_is_world_writable(tmp_path):
     """ACP workspace must be chmod 0o777 so the ACP subprocess can write into it."""
     paths = Paths(base_dir=tmp_path)
-    paths.ensure_thread_dirs("thread-2")
+    paths.ensure_thread_dirs_for("thread-2")
 
     acp_dir = tmp_path / "threads" / "thread-2" / "acp-workspace"
     mode = oct(acp_dir.stat().st_mode & 0o777)

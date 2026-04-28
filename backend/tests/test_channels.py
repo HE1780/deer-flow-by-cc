@@ -2599,7 +2599,7 @@ class TestChannelManagerIdentity:
         monkeypatch.delenv("ENABLE_IDENTITY", raising=False)
 
         fake_paths = MagicMock()
-        fake_paths.sandbox_outputs_dir.return_value = Path("/tmp/outputs")
+        fake_paths.resolve_sandbox_outputs_dir.return_value = Path("/tmp/outputs")
 
         resolved_path = MagicMock()
         resolved_path.resolve.return_value = resolved_path
@@ -2637,7 +2637,7 @@ class TestChannelManagerIdentity:
         from app.channels.manager import _resolve_attachments
 
         fake_paths = MagicMock()
-        fake_paths.sandbox_outputs_dir.return_value = Path("/tmp/outputs")
+        fake_paths.resolve_sandbox_outputs_dir.return_value = Path("/tmp/outputs")
 
         resolved_path = MagicMock()
         resolved_path.resolve.return_value = resolved_path

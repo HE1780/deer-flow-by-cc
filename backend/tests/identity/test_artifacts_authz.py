@@ -86,7 +86,7 @@ def _make_app(identity: FakeIdentity | None = None) -> FastAPI:
 
 def test_flag_off_legacy_layout_returns_200(isolated_home, flag_off):
     paths = paths_mod.get_paths()
-    paths.ensure_thread_dirs("t1")
+    paths.ensure_thread_dirs_for("t1")
     outputs = isolated_home / "threads" / "t1" / "user-data" / "outputs"
     (outputs / "hello.txt").write_text("legacy", encoding="utf-8")
 
@@ -174,7 +174,7 @@ def test_flag_on_path_traversal_returns_403(isolated_home, flag_on):
 
 def test_flag_on_anonymous_uses_legacy(isolated_home, flag_on):
     paths = paths_mod.get_paths()
-    paths.ensure_thread_dirs("t1")
+    paths.ensure_thread_dirs_for("t1")
     outputs = isolated_home / "threads" / "t1" / "user-data" / "outputs"
     (outputs / "hello.txt").write_text("legacy", encoding="utf-8")
 

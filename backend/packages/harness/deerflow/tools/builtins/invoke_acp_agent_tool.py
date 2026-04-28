@@ -37,7 +37,7 @@ def _get_work_dir(thread_id: str | None) -> str:
     paths = get_paths()
     if thread_id:
         try:
-            work_dir = paths.acp_workspace_dir(thread_id)
+            work_dir = paths.resolve_acp_workspace_dir(thread_id)
         except ValueError:
             logger.warning("Invalid thread_id %r for ACP workspace, falling back to global", thread_id)
             work_dir = paths.base_dir / "acp-workspace"

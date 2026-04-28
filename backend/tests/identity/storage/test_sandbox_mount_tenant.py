@@ -228,7 +228,7 @@ def test_aio_thread_mounts_partial_identity_falls_back(tmp_path, monkeypatch):
 
 def test_resolve_virtual_path_legacy_fallback(tmp_path):
     paths = Paths(base_dir=tmp_path)
-    paths.ensure_thread_dirs("t1")
+    paths.ensure_thread_dirs_for("t1")
 
     actual = paths.resolve_virtual_path("t1", "/mnt/user-data/outputs/report.pdf")
     assert actual == (tmp_path / "threads" / "t1" / "user-data" / "outputs" / "report.pdf").resolve()

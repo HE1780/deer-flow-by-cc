@@ -164,60 +164,53 @@ class Paths:
         return self.agent_dir(name) / "memory.json"
 
     def thread_dir(self, thread_id: str) -> Path:
-        """
-        Host path for a thread's data: `{base_dir}/threads/{thread_id}/`
+        """Host path for a thread's data (legacy single-tenant layout).
 
-        This directory contains a `user-data/` subdirectory that is mounted
-        as `/mnt/user-data/` inside the sandbox.
+        Delegates to :meth:`resolve_thread_dir` which inlines the legacy
+        ``{base_dir}/threads/{thread_id}/`` fallback when no identity ids are
+        supplied. Tenant-aware callers should use :meth:`resolve_thread_dir`
+        directly.
 
         Raises:
             ValueError: If `thread_id` contains unsafe characters (path separators
                         or `..`) that could cause directory traversal.
         """
-        return self.base_dir / "threads" / _validate_thread_id(thread_id)
+        return self.resolve_thread_dir(thread_id)
 
     def sandbox_work_dir(self, thread_id: str) -> Path:
-        """
-        Host path for the agent's workspace directory.
-        Host: `{base_dir}/threads/{thread_id}/user-data/workspace/`
+        """Host path for the agent's workspace directory (legacy layout).
+
         Sandbox: `/mnt/user-data/workspace/`
         """
-        return self.thread_dir(thread_id) / "user-data" / "workspace"
+        return self.resolve_sandbox_work_dir(thread_id)
 
     def sandbox_uploads_dir(self, thread_id: str) -> Path:
-        """
-        Host path for user-uploaded files.
-        Host: `{base_dir}/threads/{thread_id}/user-data/uploads/`
+        """Host path for user-uploaded files (legacy layout).
+
         Sandbox: `/mnt/user-data/uploads/`
         """
-        return self.thread_dir(thread_id) / "user-data" / "uploads"
+        return self.resolve_sandbox_uploads_dir(thread_id)
 
     def sandbox_outputs_dir(self, thread_id: str) -> Path:
-        """
-        Host path for agent-generated artifacts.
-        Host: `{base_dir}/threads/{thread_id}/user-data/outputs/`
+        """Host path for agent-generated artifacts (legacy layout).
+
         Sandbox: `/mnt/user-data/outputs/`
         """
-        return self.thread_dir(thread_id) / "user-data" / "outputs"
+        return self.resolve_sandbox_outputs_dir(thread_id)
 
     def acp_workspace_dir(self, thread_id: str) -> Path:
-        """
-        Host path for the ACP workspace of a specific thread.
-        Host: `{base_dir}/threads/{thread_id}/acp-workspace/`
-        Sandbox: `/mnt/acp-workspace/`
+        """Host path for the ACP workspace of a specific thread (legacy layout).
 
-        Each thread gets its own isolated ACP workspace so that concurrent
-        sessions cannot read each other's ACP agent outputs.
+        Sandbox: `/mnt/acp-workspace/`
         """
-        return self.thread_dir(thread_id) / "acp-workspace"
+        return self.resolve_acp_workspace_dir(thread_id)
 
     def sandbox_user_data_dir(self, thread_id: str) -> Path:
-        """
-        Host path for the user-data root.
-        Host: `{base_dir}/threads/{thread_id}/user-data/`
+        """Host path for the user-data root (legacy layout).
+
         Sandbox: `/mnt/user-data/`
         """
-        return self.thread_dir(thread_id) / "user-data"
+        return self.resolve_sandbox_user_data_dir(thread_id)
 
     def host_thread_dir(self, thread_id: str) -> str:
         """Host path for a thread directory, preserving Windows path syntax."""
@@ -244,35 +237,21 @@ class Paths:
         return _join_host_path(self.host_thread_dir(thread_id), "acp-workspace")
 
     def ensure_thread_dirs(self, thread_id: str) -> None:
-        """Create all standard sandbox directories for a thread.
+        """Create all standard sandbox directories for a thread (legacy layout).
 
-        Directories are created with mode 0o777 so that sandbox containers
-        (which may run as a different UID than the host backend process) can
-        write to the volume-mounted paths without "Permission denied" errors.
-        The explicit chmod() call is necessary because Path.mkdir(mode=...) is
-        subject to the process umask and may not yield the intended permissions.
-
-        Includes the ACP workspace directory so it can be volume-mounted into
-        the sandbox container at ``/mnt/acp-workspace`` even before the first
-        ACP agent invocation.
+        Delegates to :meth:`ensure_thread_dirs_for` which falls back to the
+        legacy single-tenant layout when no identity ids are supplied.
         """
-        for d in [
-            self.sandbox_work_dir(thread_id),
-            self.sandbox_uploads_dir(thread_id),
-            self.sandbox_outputs_dir(thread_id),
-            self.acp_workspace_dir(thread_id),
-        ]:
-            d.mkdir(parents=True, exist_ok=True)
-            d.chmod(0o777)
+        self.ensure_thread_dirs_for(thread_id)
 
     def delete_thread_dir(self, thread_id: str) -> None:
-        """Delete all persisted data for a thread.
+        """Delete all persisted data for a thread (legacy layout).
 
-        The operation is idempotent: missing thread directories are ignored.
+        Delegates to :meth:`delete_thread_dir_for` which falls back to the
+        legacy single-tenant layout when no identity ids are supplied.
+        Idempotent.
         """
-        thread_dir = self.thread_dir(thread_id)
-        if thread_dir.exists():
-            shutil.rmtree(thread_dir)
+        self.delete_thread_dir_for(thread_id)
 
     def delete_thread_dir_for(
         self,
@@ -342,7 +321,10 @@ class Paths:
         """
         if _is_tenant_scoped(tenant_id, workspace_id):
             return self.tenant_thread_dir(tenant_id, workspace_id, thread_id)  # type: ignore[arg-type]
-        return self.thread_dir(thread_id)
+        # Inlined legacy fallback (matches :meth:`thread_dir` body) so that
+        # ``thread_dir`` itself can become a thin delegate to this method
+        # without recursing back through us.
+        return self.base_dir / "threads" / _validate_thread_id(thread_id)
 
     def resolve_sandbox_user_data_dir(
         self,

@@ -353,7 +353,7 @@ def _resolve_attachments(
 
     attachments: list[ResolvedAttachment] = []
     paths = get_paths()
-    outputs_dir = paths.sandbox_outputs_dir(thread_id).resolve()
+    outputs_dir = paths.resolve_sandbox_outputs_dir(thread_id).resolve()
     for virtual_path in artifacts:
         # Security: only allow files from the agent outputs directory
         if not virtual_path.startswith(_OUTPUTS_VIRTUAL_PREFIX):

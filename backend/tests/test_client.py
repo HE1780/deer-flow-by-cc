@@ -1491,7 +1491,7 @@ class TestArtifacts:
     def test_get_artifact(self, client):
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            outputs = paths.sandbox_outputs_dir("t1")
+            outputs = paths.resolve_sandbox_outputs_dir("t1")
             outputs.mkdir(parents=True)
             (outputs / "result.txt").write_text("artifact content")
 
@@ -1504,7 +1504,7 @@ class TestArtifacts:
     def test_get_artifact_not_found(self, client):
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            paths.sandbox_user_data_dir("t1").mkdir(parents=True)
+            paths.resolve_sandbox_user_data_dir("t1").mkdir(parents=True)
 
             with patch("deerflow.client.get_paths", return_value=paths):
                 with pytest.raises(FileNotFoundError):
@@ -1517,7 +1517,7 @@ class TestArtifacts:
     def test_get_artifact_path_traversal(self, client):
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            paths.sandbox_user_data_dir("t1").mkdir(parents=True)
+            paths.resolve_sandbox_user_data_dir("t1").mkdir(parents=True)
 
             with patch("deerflow.client.get_paths", return_value=paths):
                 with pytest.raises(PathTraversalError):
@@ -1707,7 +1707,7 @@ class TestScenarioFileLifecycle:
             uploads_dir.mkdir()
 
             paths = Paths(base_dir=tmp_path)
-            outputs_dir = paths.sandbox_outputs_dir("t-artifact")
+            outputs_dir = paths.resolve_sandbox_outputs_dir("t-artifact")
             outputs_dir.mkdir(parents=True)
 
             # Upload phase
@@ -1959,9 +1959,9 @@ class TestScenarioThreadIsolation:
         """Artifacts in thread-A are not accessible from thread-B."""
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            outputs_a = paths.sandbox_outputs_dir("thread-a")
+            outputs_a = paths.resolve_sandbox_outputs_dir("thread-a")
             outputs_a.mkdir(parents=True)
-            paths.sandbox_user_data_dir("thread-b").mkdir(parents=True)
+            paths.resolve_sandbox_user_data_dir("thread-b").mkdir(parents=True)
             (outputs_a / "result.txt").write_text("thread-a artifact")
 
             with patch("deerflow.client.get_paths", return_value=paths):
@@ -2871,7 +2871,7 @@ class TestArtifactHardening:
         """get_artifact rejects paths that resolve to a directory."""
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            subdir = paths.sandbox_outputs_dir("t1") / "subdir"
+            subdir = paths.resolve_sandbox_outputs_dir("t1") / "subdir"
             subdir.mkdir(parents=True)
 
             with patch("deerflow.client.get_paths", return_value=paths):
@@ -2882,7 +2882,7 @@ class TestArtifactHardening:
         """Paths with leading slash are handled correctly."""
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            outputs = paths.sandbox_outputs_dir("t1")
+            outputs = paths.resolve_sandbox_outputs_dir("t1")
             outputs.mkdir(parents=True)
             (outputs / "file.txt").write_text("content")
 
@@ -2998,7 +2998,7 @@ class TestBugArtifactPrefixMatchTooLoose:
         """Bare 'mnt/user-data' is accepted (will later fail as directory, not at prefix)."""
         with tempfile.TemporaryDirectory() as tmp:
             paths = Paths(base_dir=tmp)
-            paths.sandbox_user_data_dir("t1").mkdir(parents=True)
+            paths.resolve_sandbox_user_data_dir("t1").mkdir(parents=True)
 
             with patch("deerflow.client.get_paths", return_value=paths):
                 # Accepted at prefix check, but fails because it's a directory.
@@ -3022,7 +3022,7 @@ class TestBugListUploadsDeadCode:
             # can thread tenant/workspace ids through when the caller supplies
             # them. Both names are mocked for belt-and-braces coverage.
             mock_paths.resolve_sandbox_uploads_dir.return_value = non_existent
-            mock_paths.sandbox_uploads_dir.return_value = non_existent
+            mock_paths.resolve_sandbox_uploads_dir.return_value = non_existent
 
             with patch("deerflow.uploads.manager.get_paths", return_value=mock_paths):
                 result = client.list_uploads("thread-fresh")
