@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
 import { getAPIClient } from "../api";
+import { extractWriteFilePath } from "../artifacts/invalidation";
 import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
 import type { FileInMessage } from "../messages/utils";
@@ -226,6 +227,15 @@ export function useThreadStream({
           name: event.name,
           data: event.data,
         });
+        const mutatedPath = extractWriteFilePath(event.name, event.data);
+        if (mutatedPath) {
+          // The agent just wrote/modified this file on disk. Invalidate the
+          // cached artifact body so the side panel refetches the new content.
+          void queryClient.invalidateQueries({
+            queryKey: ["artifact", mutatedPath],
+            exact: false,
+          });
+        }
       }
     },
     onUpdateEvent(data) {
