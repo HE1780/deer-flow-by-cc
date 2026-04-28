@@ -17,6 +17,8 @@ DeerFlow is a LangGraph-based AI super agent system with a full-stack architectu
 - **Standard mode** (`make dev`): LangGraph Server handles agent execution as a separate process. 4 processes total.
 - **Gateway mode** (`make dev-pro`, experimental): Agent runtime embedded in Gateway via `RunManager` + `run_agent()` + `StreamBridge` (`packages/harness/deerflow/runtime/`). Service manages its own concurrency via async tasks. 3 processes total, no LangGraph Server.
 
+**Known limitation — Standard mode + LLM event loop:** Under `make dev`, the memory updater and subagent executor still hand LLM calls to a fresh ephemeral `asyncio.run(...)` loop. This can trip [langchain-ai/langchain#35783](https://github.com/langchain-ai/langchain/issues/35783) — the `langchain_openai` cached httpx client outlives its first loop and crashes with `RuntimeError: Event loop is closed` on the next call. Gateway mode avoids this by registering the long-lived Uvicorn loop via `deerflow.runtime.main_loop.set_main_loop` during lifespan startup; both call sites then funnel work through `submit_to_main_loop` (see `docs/superpowers/specs/2026-04-28-llm-event-loop-closed-design.md`). Production deployments should prefer Gateway mode.
+
 **Project Structure**:
 ```
 deer-flow/

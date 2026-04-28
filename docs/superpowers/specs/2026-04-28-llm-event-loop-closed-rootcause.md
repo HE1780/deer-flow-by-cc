@@ -1,6 +1,6 @@
 # Event Loop is Closed — 根因报告（草稿）
 
-**状态：** 仅根因（Phase 1 完成），方案待 brainstorm
+**状态：** Gateway mode 已闭环（main-loop reuse 改造，见 [`2026-04-28-llm-event-loop-closed-design.md`](./2026-04-28-llm-event-loop-closed-design.md)）；Standard mode 文档化为已知限制（见 backend/CLAUDE.md Runtime Modes 章节）。
 **报告日期：** 2026-04-28
 **复现日期：** 2026-04-28 08:35:14（gateway.log line 981）
 **部署模式：** Gateway 模式（`make dev-pro`），LangGraph 标准模式未观测到该 bug
