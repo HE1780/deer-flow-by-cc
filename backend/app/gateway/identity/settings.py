@@ -24,6 +24,12 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _sanitize_days(value: int) -> int:
+    if value < 1 or value > 90:
+        return 7
+    return value
+
+
 def _deerflow_home() -> str:
     return os.environ.get("DEERFLOW_HOME") or os.path.join(os.path.expanduser("~"), ".deerflow")
 
@@ -77,6 +83,8 @@ class IdentitySettings:
     # M5: allowed clock skew (seconds) for HMAC identity propagation between
     # Gateway and LangGraph. Default 300s matches spec §5.4.
     hmac_skew_sec: int
+    # Registration code lifetime in days (1-90, default 7).
+    registration_code_expires_days: int
 
 
 @lru_cache(maxsize=1)
@@ -114,4 +122,7 @@ def get_identity_settings() -> IdentitySettings:
         bcrypt_cost=_env_int("DEERFLOW_BCRYPT_COST", 12),
         internal_signing_key=os.environ.get("DEERFLOW_INTERNAL_SIGNING_KEY") or None,
         hmac_skew_sec=_env_int("DEERFLOW_HMAC_SKEW_SEC", 300),
+        registration_code_expires_days=_sanitize_days(
+            _env_int("REGISTRATION_CODE_EXPIRES_DAYS", 7)
+        ),
     )

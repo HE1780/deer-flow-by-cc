@@ -113,3 +113,26 @@ async def test_role_permission_map_covers_all_roles(fresh_db):
         for role_key, scope, _ in PREDEFINED_ROLES:
             perms_for_role = PREDEFINED_ROLE_PERMISSIONS.get((role_key, scope), [])
             assert len(perms_for_role) > 0, f"Role {role_key}/{scope} has no permissions"
+
+
+def test_workspace_member_role_in_predefined():
+    from app.gateway.identity.bootstrap import PREDEFINED_ROLES, PREDEFINED_ROLE_PERMISSIONS
+
+    keys = {(k, s) for k, s, _ in PREDEFINED_ROLES}
+    assert ("workspace_member", "workspace") in keys
+
+    perms = PREDEFINED_ROLE_PERMISSIONS[("workspace_member", "workspace")]
+    expected = {
+        "thread:read", "thread:write", "thread:delete",
+        "skill:read", "skill:invoke",
+        "knowledge:read", "knowledge:write",
+        "workflow:read", "workflow:run",
+        "settings:read",
+    }
+    assert set(perms) == expected
+    # Confirm publish/manage are NOT granted.
+    assert "skill:publish" not in perms
+    assert "skill:manage" not in perms
+    assert "knowledge:manage" not in perms
+    assert "workflow:manage" not in perms
+    assert "settings:update" not in perms

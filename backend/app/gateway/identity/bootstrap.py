@@ -67,8 +67,9 @@ PREDEFINED_ROLES: list[tuple[str, str, str]] = [
     ("platform_admin", "platform", "Platform super-administrator (cross-tenant)"),
     ("tenant_owner", "tenant", "Tenant owner (manages workspaces, members, tokens)"),
     ("workspace_admin", "workspace", "Workspace administrator (manages resources + members)"),
-    ("member", "workspace", "Workspace member (create threads, invoke skills)"),
+    ("member", "workspace", "Workspace member [legacy — pre-registration; includes skill:publish]"),
     ("viewer", "workspace", "Read-only viewer"),
+    ("workspace_member", "workspace", "Workspace member (basic usage of own resources)"),
 ]
 
 _PLATFORM_PERMS = [tag for tag, scope in PREDEFINED_PERMISSIONS if scope == "platform"]
@@ -93,6 +94,18 @@ PREDEFINED_ROLE_PERMISSIONS: dict[tuple[str, str], list[str]] = {
         "settings:read",
     ],
     ("viewer", "workspace"): [p for p in _WORKSPACE_PERMS if p.endswith(":read")],
+    ("workspace_member", "workspace"): [
+        "thread:read",
+        "thread:write",
+        "thread:delete",
+        "skill:read",
+        "skill:invoke",
+        "knowledge:read",
+        "knowledge:write",
+        "workflow:read",
+        "workflow:run",
+        "settings:read",
+    ],
 }
 
 

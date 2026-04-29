@@ -8,12 +8,14 @@ These complement ``routers/admin.py`` (read-only) and ``routers/me.py``
 from __future__ import annotations
 
 import re
-from datetime import datetime
+import secrets
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, field_validator
+from sqlalchemy import func as sql_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +24,7 @@ from app.gateway.identity.db import get_session
 from app.gateway.identity.models import (
     ApiToken,
     Membership,
+    RegistrationCode,
     Role,
     Tenant,
     User,
@@ -29,16 +32,13 @@ from app.gateway.identity.models import (
     WorkspaceMember,
 )
 from app.gateway.identity.rbac.decorator import requires
+from app.gateway.identity.settings import get_identity_settings
+from app.gateway.identity.validators import EMAIL_RE
 
 router = APIRouter(tags=["identity-admin-writes"])
 
 
 # --- Schemas ---------------------------------------------------------------
-
-
-# Pragmatic email regex — RFC 5322 is too permissive for our needs and we
-# don't want to drag in `email-validator`. Tightened during onboarding flow.
-_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 
 class CreateUserIn(BaseModel):
@@ -50,7 +50,7 @@ class CreateUserIn(BaseModel):
     @classmethod
     def _email_shape(cls, v: str) -> str:
         v = v.strip()
-        if not _EMAIL_RE.match(v):
+        if not EMAIL_RE.match(v):
             raise ValueError("invalid email format")
         return v
 
@@ -104,6 +104,31 @@ class CreateTokenOut(BaseModel):
     id: int
     plaintext: str
     prefix: str
+
+
+class CreateRegistrationCodeOut(BaseModel):
+    id: int
+    tenant_id: int
+    code: str  # plaintext, returned once
+    code_prefix: str
+    expires_at: datetime
+    created_at: datetime
+
+
+class RegistrationCodeOut(BaseModel):
+    id: int
+    tenant_id: int
+    code_prefix: str
+    status: int
+    expires_at: datetime
+    accepted_by: int | None
+    accepted_at: datetime | None
+    created_at: datetime
+
+
+class RegistrationCodeListOut(BaseModel):
+    items: list[RegistrationCodeOut]
+    total: int
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -593,5 +618,126 @@ async def delete_workspace(
         tid,
     )
     await session.delete(ws)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Registration codes (Tasks 6-8)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/api/tenants/{tid}/registration-codes",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("membership:invite", "tenant"))],
+    response_model=CreateRegistrationCodeOut,
+)
+async def create_registration_code(
+    tid: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> CreateRegistrationCodeOut:
+    settings = get_identity_settings()
+    plaintext = secrets.token_urlsafe(32)
+    code_hash = bcrypt.hashpw(
+        plaintext.encode(),
+        bcrypt.gensalt(rounds=settings.bcrypt_cost),
+    ).decode()
+    expires_at = datetime.now(UTC) + timedelta(days=settings.registration_code_expires_days)
+
+    rc = RegistrationCode(
+        tenant_id=tid,
+        creator_id=_caller_user_id(request),
+        code_hash=code_hash,
+        code_prefix=plaintext[:8],
+        status=0,
+        expires_at=expires_at,
+    )
+    session.add(rc)
+    await session.flush()
+    await session.commit()
+    await session.refresh(rc)
+
+    return CreateRegistrationCodeOut(
+        id=rc.id,
+        tenant_id=tid,
+        code=plaintext,
+        code_prefix=plaintext[:8],
+        expires_at=expires_at,
+        created_at=rc.created_at,
+    )
+
+
+@router.get(
+    "/api/tenants/{tid}/registration-codes",
+    dependencies=[Depends(requires("membership:read", "tenant"))],
+    response_model=RegistrationCodeListOut,
+)
+async def list_registration_codes(
+    tid: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_session),
+) -> RegistrationCodeListOut:
+    total = (
+        await session.execute(
+            select(sql_func.count(RegistrationCode.id)).where(RegistrationCode.tenant_id == tid)
+        )
+    ).scalar() or 0
+
+    rows = (
+        await session.execute(
+            select(RegistrationCode)
+            .where(RegistrationCode.tenant_id == tid)
+            .order_by(RegistrationCode.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+
+    return RegistrationCodeListOut(
+        items=[
+            RegistrationCodeOut(
+                id=r.id,
+                tenant_id=r.tenant_id,
+                code_prefix=r.code_prefix,
+                status=r.status,
+                expires_at=r.expires_at,
+                accepted_by=r.accepted_by,
+                accepted_at=r.accepted_at,
+                created_at=r.created_at,
+            )
+            for r in rows
+        ],
+        total=int(total),
+    )
+
+
+@router.delete(
+    "/api/tenants/{tid}/registration-codes/{rid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("membership:invite", "tenant"))],
+)
+async def revoke_registration_code(
+    tid: int,
+    rid: int,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    rc = (
+        await session.execute(
+            select(RegistrationCode).where(
+                RegistrationCode.id == rid,
+                RegistrationCode.tenant_id == tid,
+            )
+        )
+    ).scalar_one_or_none()
+    if rc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "registration code not found")
+    if rc.status != 0:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "only pending codes can be revoked"
+        )
+    rc.status = 3
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
