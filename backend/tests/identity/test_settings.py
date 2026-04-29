@@ -225,3 +225,39 @@ def test_deer_flow_home_from_env(tmp_path, monkeypatch):
     get_identity_settings.cache_clear()
     s = get_identity_settings()
     assert s.deer_flow_home == str(tmp_path)
+
+
+# --- Registration code expires days ---
+
+
+def test_registration_code_expires_days_default(monkeypatch):
+    from app.gateway.identity.settings import get_identity_settings
+
+    monkeypatch.delenv("REGISTRATION_CODE_EXPIRES_DAYS", raising=False)
+    get_identity_settings.cache_clear()
+    s = get_identity_settings()
+    assert s.registration_code_expires_days == 7
+
+
+def test_registration_code_expires_days_clamped_low(monkeypatch):
+    from app.gateway.identity.settings import get_identity_settings
+
+    monkeypatch.setenv("REGISTRATION_CODE_EXPIRES_DAYS", "0")
+    get_identity_settings.cache_clear()
+    assert get_identity_settings().registration_code_expires_days == 7
+
+
+def test_registration_code_expires_days_clamped_high(monkeypatch):
+    from app.gateway.identity.settings import get_identity_settings
+
+    monkeypatch.setenv("REGISTRATION_CODE_EXPIRES_DAYS", "999")
+    get_identity_settings.cache_clear()
+    assert get_identity_settings().registration_code_expires_days == 7
+
+
+def test_registration_code_expires_days_in_range(monkeypatch):
+    from app.gateway.identity.settings import get_identity_settings
+
+    monkeypatch.setenv("REGISTRATION_CODE_EXPIRES_DAYS", "30")
+    get_identity_settings.cache_clear()
+    assert get_identity_settings().registration_code_expires_days == 30
