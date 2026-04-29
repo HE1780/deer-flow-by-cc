@@ -716,3 +716,32 @@ async def list_registration_codes(
         ],
         total=int(total),
     )
+
+
+@router.delete(
+    "/api/tenants/{tid}/registration-codes/{rid}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("membership:invite", "tenant"))],
+)
+async def revoke_registration_code(
+    tid: int,
+    rid: int,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    rc = (
+        await session.execute(
+            select(RegistrationCode).where(
+                RegistrationCode.id == rid,
+                RegistrationCode.tenant_id == tid,
+            )
+        )
+    ).scalar_one_or_none()
+    if rc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "registration code not found")
+    if rc.status != 0:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "only pending codes can be revoked"
+        )
+    rc.status = 3
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

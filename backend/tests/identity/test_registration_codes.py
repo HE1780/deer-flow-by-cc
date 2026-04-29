@@ -153,3 +153,64 @@ def test_list_codes_anonymous_401(codes_app):
     with TestClient(app) as c:
         r = c.get("/api/tenants/1/registration-codes")
     assert r.status_code == 401
+
+
+def test_revoke_pending_code_returns_204(codes_app):
+    app, holder = codes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
+
+    fake = SimpleNamespace(id=42, tenant_id=1, status=0)
+
+    class _S(_StubSession):
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalar_one_or_none.return_value = fake
+            return r
+
+    holder["session"] = _S()
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/1/registration-codes/42")
+    assert r.status_code == 204
+    assert fake.status == 3  # revoked
+
+
+def test_revoke_missing_code_404(codes_app):
+    app, holder = codes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
+
+    class _S(_StubSession):
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalar_one_or_none.return_value = None
+            return r
+
+    holder["session"] = _S()
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/1/registration-codes/999")
+    assert r.status_code == 404
+
+
+def test_revoke_already_accepted_code_409(codes_app):
+    app, holder = codes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
+
+    fake = SimpleNamespace(id=42, tenant_id=1, status=1)  # accepted
+
+    class _S(_StubSession):
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalar_one_or_none.return_value = fake
+            return r
+
+    holder["session"] = _S()
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/1/registration-codes/42")
+    assert r.status_code == 409
+
+
+def test_revoke_member_403(codes_app):
+    app, holder = codes_app
+    holder["identity"] = _identity_for_role("member", tenant_id=1)
+    with TestClient(app) as c:
+        r = c.delete("/api/tenants/1/registration-codes/42")
+    assert r.status_code == 403
