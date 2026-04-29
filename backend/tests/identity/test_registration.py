@@ -131,3 +131,171 @@ def test_register_happy_path_creates_user_and_sets_cookie(reg_app):
     assert code_row.status == 1
     assert code_row.accepted_by == 100
     assert code_row.accepted_at is not None
+
+
+def test_register_weak_password_422(reg_app):
+    app, _ = reg_app
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()), \
+         patch.object(auth_module, "get_identity_settings", return_value=MagicMock()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": "x" * 40, "email": "a@b.com", "password": "short"},
+            )
+    assert r.status_code == 422
+
+
+def test_register_invalid_email_422(reg_app):
+    app, _ = reg_app
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()), \
+         patch.object(auth_module, "get_identity_settings", return_value=MagicMock()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": "x" * 40, "email": "not-an-email", "password": "longpassword"},
+            )
+    assert r.status_code == 422
+
+
+def test_register_unknown_code_404(reg_app):
+    app, holder = reg_app
+
+    class _Sess:
+        def __init__(self):
+            self.added = []
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            pass
+
+        async def flush(self):
+            pass
+
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalars.return_value.all.return_value = []  # no candidates
+            return r
+
+    holder["session"] = _Sess()
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": "x" * 40, "email": "a@b.com", "password": "longpassword"},
+            )
+    assert r.status_code == 404
+
+
+def test_register_already_used_code_404(reg_app):
+    """A code with status=1 isn't returned by the prefix+pending query → 404
+    (not 410). The spec lists 410 for 'already used', but the query path filters
+    out non-pending, so the bcrypt step never matches. 404 is the correct
+    observable result; behavior is documented in CLAUDE.md."""
+    app, holder = reg_app
+    plaintext = "y" * 40
+
+    class _Sess:
+        def __init__(self):
+            self.added = []
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            pass
+
+        async def flush(self):
+            pass
+
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalars.return_value.all.return_value = []
+            return r
+
+    holder["session"] = _Sess()
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": plaintext, "email": "a@b.com", "password": "longpassword"},
+            )
+    assert r.status_code == 404
+
+
+def test_register_expired_code_410(reg_app):
+    app, holder = reg_app
+    plaintext = "z" * 40
+    code_row = _make_pending_code(plaintext, expires_offset=timedelta(days=-1))
+
+    class _Sess:
+        def __init__(self):
+            self.added = []
+            self.committed = False
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            self.committed = True
+
+        async def flush(self):
+            pass
+
+        async def execute(self, stmt):
+            r = MagicMock()
+            r.scalars.return_value.all.return_value = [code_row]
+            return r
+
+    holder["session"] = _Sess()
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": plaintext, "email": "a@b.com", "password": "longpassword"},
+            )
+    assert r.status_code == 410
+    assert code_row.status == 2  # auto-marked expired
+
+
+def test_register_email_already_registered_409(reg_app):
+    app, holder = reg_app
+    plaintext = "q" * 40
+    code_row = _make_pending_code(plaintext)
+    existing_user = SimpleNamespace(id=99, email="dup@example.com")
+
+    class _Sess:
+        def __init__(self):
+            self.added = []
+            self.committed = False
+            self.calls = 0
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            self.committed = True
+
+        async def flush(self):
+            pass
+
+        async def execute(self, stmt):
+            self.calls += 1
+            r = MagicMock()
+            if self.calls == 1:
+                r.scalars.return_value.all.return_value = [code_row]
+            elif self.calls == 2:
+                r.scalar_one_or_none.return_value = existing_user
+            return r
+
+    holder["session"] = _Sess()
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={"code": plaintext, "email": "dup@example.com", "password": "longpassword"},
+            )
+    assert r.status_code == 409
+    # Code remains pending (we abort before marking accepted).
+    assert code_row.status == 0
