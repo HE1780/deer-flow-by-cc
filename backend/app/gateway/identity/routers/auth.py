@@ -315,7 +315,7 @@ async def register(
     session.add(user)
     await session.flush()
 
-    session.add(Membership(user_id=user.id, tenant_id=rc.tenant_id))
+    session.add(Membership(user_id=user.id, tenant_id=rc.tenant_id, status=1))
     session.add(WorkspaceMember(user_id=user.id, workspace_id=ws.id, role_id=member_role.id))
 
     rc.status = 1
