@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -48,6 +48,9 @@ class _StubSession:
         self.committed = True
 
     async def flush(self):
+        pass
+
+    async def refresh(self, obj):
         pass
 
     async def execute(self, stmt):

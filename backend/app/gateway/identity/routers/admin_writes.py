@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
@@ -643,8 +643,11 @@ async def create_registration_code(
 ) -> CreateRegistrationCodeOut:
     settings = get_identity_settings()
     plaintext = secrets.token_urlsafe(32)
-    code_hash = bcrypt.hashpw(plaintext.encode(), bcrypt.gensalt()).decode()
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.registration_code_expires_days)
+    code_hash = bcrypt.hashpw(
+        plaintext.encode(),
+        bcrypt.gensalt(rounds=settings.bcrypt_cost),
+    ).decode()
+    expires_at = datetime.now(UTC) + timedelta(days=settings.registration_code_expires_days)
 
     rc = RegistrationCode(
         tenant_id=tid,
@@ -657,6 +660,7 @@ async def create_registration_code(
     session.add(rc)
     await session.flush()
     await session.commit()
+    await session.refresh(rc)
 
     return CreateRegistrationCodeOut(
         id=rc.id,
