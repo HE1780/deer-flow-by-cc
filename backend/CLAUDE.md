@@ -466,6 +466,24 @@ Docs: `docs/UPGRADE_v2.md` (path A greenfield / path B migration), `docs/identit
 
 **Still open for a follow-up session:** None — M7 Part C.8 (GitHub Actions identity E2E smoke) shipped via `.github/workflows/identity-e2e-smoke.yml` (bypasses OIDC by minting an RS256 JWT directly for the bootstrap admin); channel identity TODO resolved via `ChannelStore` persistence of `tenant_id`/`workspace_id` and `Paths.resolve_virtual_path` wiring.
 
+**Registration code flow (P1, 2026-04-29):**
+
+A self-service onboarding path for tenant_owner-issued one-time codes.
+
+- `identity.registration_codes` table (alembic 0006) stores bcrypt-hashed codes with `code_prefix` (first 8 chars of plaintext) for prefix-filtered lookup. Plaintext is returned **only** at creation time.
+- `workspace_member` role added to `PREDEFINED_ROLES` — granted thread/skill-invoke/knowledge/workflow read+write+delete and `settings:read`. Excludes `skill:publish`, `*:manage`, `settings:update`. **Do not confuse with the legacy `member` role**, which still exists for pre-registration users and has wider permissions including `skill:publish`. New users registered via `/api/auth/register` always get `workspace_member`, never `member`.
+- Admin endpoints (`@requires("membership:invite", "tenant")` for write, `"membership:read"` for list):
+  - `POST /api/tenants/{tid}/registration-codes` → `{id, code, code_prefix, expires_at, ...}` (plaintext returned **once**)
+  - `GET  /api/tenants/{tid}/registration-codes` → paginated list (`?limit=1..200`, `?offset>=0`), `code_hash`/`code` never returned
+  - `DELETE /api/tenants/{tid}/registration-codes/{rid}` → 204 if pending; 409 if status≠pending
+- Public endpoint:
+  - `POST /api/auth/register {code, email, password, display_name?}` → 201 + session cookie (sets `deerflow_session` HttpOnly, same as `/api/auth/login`). Creates `User`, `Membership(tenant=code.tenant)`, `WorkspaceMember(workspace=default, role=workspace_member)`. Marks code `status=accepted`. Returns `{"status": "ok", "email": <lowercased>}`.
+- Env: `REGISTRATION_CODE_EXPIRES_DAYS` (default 7, sanitized to [1,90] — out-of-range values fall back to 7).
+- Concurrency: relies on `User.email` unique constraint as the tiebreaker — second concurrent register of the same email gets 409 from a downstream IntegrityError path. No `SELECT FOR UPDATE`.
+- Brute-force defense: code lookup is **always** prefix-filtered before bcrypt; full plaintext token is `secrets.token_urlsafe(32)` (≈256 bit entropy). bcrypt cost is `DEERFLOW_BCRYPT_COST` (default 12).
+- Observable status mapping: spec §7.4 lists 410 for accepted/revoked codes, but because the lookup query filters `status==pending`, those branches never run — the user sees 404. Documented behavior, not a bug. Same for `/api/auth/register`'s 422 responses: they have two sources — Pydantic schema rejection (structured detail array) and handler business rejection (string detail); callers should distinguish by inspecting the `detail` field type.
+- Shared validator: `app.gateway.identity.validators.EMAIL_RE` is the single source of truth for the email format used by both `/register` and admin user-create endpoints.
+
 **Roadmap:** M1 – M7 全部 shipped（含 M7-A admin UI、M7-B migration、M7-C release hardening）。后续 P1+ 路线图入口见 `docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`。开放议题与下一步讨论方向集中在 `docs/OPEN_ISSUES.md`。
 
 ### Model Factory (`packages/harness/deerflow/models/factory.py`)
