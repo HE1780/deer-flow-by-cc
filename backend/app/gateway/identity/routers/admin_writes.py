@@ -8,7 +8,8 @@ These complement ``routers/admin.py`` (read-only) and ``routers/me.py``
 from __future__ import annotations
 
 import re
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import bcrypt
@@ -22,6 +23,7 @@ from app.gateway.identity.db import get_session
 from app.gateway.identity.models import (
     ApiToken,
     Membership,
+    RegistrationCode,
     Role,
     Tenant,
     User,
@@ -29,6 +31,7 @@ from app.gateway.identity.models import (
     WorkspaceMember,
 )
 from app.gateway.identity.rbac.decorator import requires
+from app.gateway.identity.settings import get_identity_settings
 
 router = APIRouter(tags=["identity-admin-writes"])
 
@@ -104,6 +107,31 @@ class CreateTokenOut(BaseModel):
     id: int
     plaintext: str
     prefix: str
+
+
+class CreateRegistrationCodeOut(BaseModel):
+    id: int
+    tenant_id: int
+    code: str  # plaintext, returned once
+    code_prefix: str
+    expires_at: datetime
+    created_at: datetime
+
+
+class RegistrationCodeOut(BaseModel):
+    id: int
+    tenant_id: int
+    code_prefix: str
+    status: int
+    expires_at: datetime
+    accepted_by: int | None
+    accepted_at: datetime | None
+    created_at: datetime
+
+
+class RegistrationCodeListOut(BaseModel):
+    items: list[RegistrationCodeOut]
+    total: int
 
 
 # --- Helpers ---------------------------------------------------------------
@@ -595,3 +623,46 @@ async def delete_workspace(
     await session.delete(ws)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Registration codes (Tasks 6-8)
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/api/tenants/{tid}/registration-codes",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("membership:invite", "tenant"))],
+    response_model=CreateRegistrationCodeOut,
+)
+async def create_registration_code(
+    tid: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> CreateRegistrationCodeOut:
+    settings = get_identity_settings()
+    plaintext = secrets.token_urlsafe(32)
+    code_hash = bcrypt.hashpw(plaintext.encode(), bcrypt.gensalt()).decode()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.registration_code_expires_days)
+
+    rc = RegistrationCode(
+        tenant_id=tid,
+        creator_id=_caller_user_id(request),
+        code_hash=code_hash,
+        code_prefix=plaintext[:8],
+        status=0,
+        expires_at=expires_at,
+    )
+    session.add(rc)
+    await session.flush()
+    await session.commit()
+
+    return CreateRegistrationCodeOut(
+        id=rc.id,
+        tenant_id=tid,
+        code=plaintext,
+        code_prefix=plaintext[:8],
+        expires_at=expires_at,
+        created_at=rc.created_at,
+    )
