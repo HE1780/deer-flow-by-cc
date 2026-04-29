@@ -419,6 +419,10 @@ export interface Translations {
       tenantsTitle: string;
       usersTitle: string;
       rolesTitle: string;
+      rolesScopePlatform: string;
+      rolesScopeTenant: string;
+      rolesScopeWorkspace: string;
+      rolesBuiltinTag: string;
       workspacesTitle: string;
       tokensTitle: string;
       auditTitle: string;

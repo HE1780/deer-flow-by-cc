@@ -5,9 +5,11 @@ import {
   identityFetch,
 } from "./fetcher";
 import {
+  type AdminSetPasswordPayload,
   type AddWorkspaceMemberPayload,
   type AuditFilters,
   type AuditRow,
+  type ChangePasswordPayload,
   type CreateMyTokenPayload,
   type CreateOrgKeyPayload,
   type CreateTenantPayload,
@@ -216,6 +218,16 @@ export const identityApi = {
   updateMe: (payload: UpdateMePayload) =>
     identityFetch<MeResponse>("/api/me", {
       method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  changePassword: (payload: ChangePasswordPayload) =>
+    identityFetch<{ status: string }>("/api/me/password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  adminSetPassword: (payload: AdminSetPasswordPayload) =>
+    identityFetch<{ status: string }>("/api/auth/set-password", {
+      method: "POST",
       body: JSON.stringify(payload),
     }),
 

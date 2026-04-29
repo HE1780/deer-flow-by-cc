@@ -29,6 +29,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/core/i18n/hooks";
 import {
+  useChangePassword,
   useCreateMyToken,
   useIdentity,
   useMySessions,
@@ -108,6 +109,7 @@ export default function ProfilePage() {
             initialName={identity.display_name ?? ""}
             email={identity.email}
           />
+          <ChangePasswordForm />
           <section>
             <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
               {t.admin.profile.activeTenant}
@@ -236,6 +238,78 @@ function ProfileBasicForm({
           data-testid="profile-save-btn"
         >
           {isSubmitting ? "Saving…" : saved ? "Saved!" : "Save changes"}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+function ChangePasswordForm() {
+  const changePassword = useChangePassword();
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  /**
+   * Submits password change for the current authenticated user.
+   */
+  async function submitChangePassword(
+    event: React.SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setError(null);
+    setSaved(false);
+    try {
+      await changePassword.mutateAsync({
+        old_password: oldPassword,
+        new_password: newPassword,
+      });
+      setOldPassword("");
+      setNewPassword("");
+      setSaved(true);
+    } catch (err) {
+      setError((err as Error).message || "修改密码失败");
+    }
+  }
+
+  return (
+    <section data-testid="profile-password-form">
+      <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        密码
+      </h2>
+      <form onSubmit={submitChangePassword} className="space-y-3 max-w-sm">
+        <div className="grid gap-1 text-sm">
+          <label htmlFor="profile-old-password">当前密码</label>
+          <Input
+            id="profile-old-password"
+            type="password"
+            autoComplete="current-password"
+            value={oldPassword}
+            onChange={(event) => setOldPassword(event.target.value)}
+            required
+          />
+        </div>
+        <div className="grid gap-1 text-sm">
+          <label htmlFor="profile-new-password">新密码</label>
+          <Input
+            id="profile-new-password"
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            minLength={8}
+            required
+          />
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        {saved && <p className="text-sm text-green-600">密码已更新</p>}
+        <Button
+          type="submit"
+          size="sm"
+          disabled={changePassword.isPending || !oldPassword || !newPassword}
+        >
+          {changePassword.isPending ? "提交中…" : "修改密码"}
         </Button>
       </form>
     </section>

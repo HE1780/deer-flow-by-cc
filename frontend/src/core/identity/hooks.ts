@@ -13,7 +13,9 @@ import { identityApi } from "./api";
 import { identityKeys } from "./query-keys";
 import {
   type AddWorkspaceMemberPayload,
+  type AdminSetPasswordPayload,
   type AuditFilters,
+  type ChangePasswordPayload,
   type CreateMyTokenPayload,
   type CreateOrgKeyPayload,
   type CreateTenantPayload,
@@ -476,6 +478,20 @@ export function useUpdateMe() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: identityKeys.me() });
     },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (payload: ChangePasswordPayload) =>
+      identityApi.changePassword(payload),
+  });
+}
+
+export function useAdminSetPassword() {
+  return useMutation({
+    mutationFn: (payload: AdminSetPasswordPayload) =>
+      identityApi.adminSetPassword(payload),
   });
 }
 

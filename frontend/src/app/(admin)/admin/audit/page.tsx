@@ -2,7 +2,7 @@
 "use client";
 
 import { DownloadIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,9 +31,43 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useI18n } from "@/core/i18n/hooks";
+import { identityApi } from "@/core/identity/api";
 import { RequirePermission } from "@/core/identity/components/RequirePermission";
 import { useAudit, useIdentity } from "@/core/identity/hooks";
 import type { AuditFilters, AuditRow } from "@/core/identity/types";
+
+/**
+ * Format backend UTC timestamp into local wall-clock time for display.
+ */
+function formatAuditLocalTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+/**
+ * Render actor label as "email (id)" with safe fallback to id.
+ */
+function formatActorLabel(
+  userId: number | null,
+  emailByUserId: Record<number, string | null>,
+): string {
+  if (userId == null) return "—";
+  const email = emailByUserId[userId];
+  if (email && email.trim().length > 0) {
+    return `${email} (${userId})`;
+  }
+  return String(userId);
+}
 
 export default function AuditPage() {
   return (
@@ -62,6 +96,9 @@ function Inner() {
     undefined,
   ]);
   const [selected, setSelected] = useState<AuditRow | null>(null);
+  const [emailByUserId, setEmailByUserId] = useState<Record<number, string | null>>(
+    {},
+  );
 
   const currentCursor = cursorStack[cursorStack.length - 1];
 
@@ -69,6 +106,53 @@ function Inner() {
     ...filters,
     cursor: currentCursor,
   });
+
+  const pendingActorIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const item of data?.items ?? []) {
+      if (item.user_id != null && emailByUserId[item.user_id] === undefined) {
+        ids.add(item.user_id);
+      }
+    }
+    return Array.from(ids);
+  }, [data?.items, emailByUserId]);
+
+  /**
+   * Lazy-load emails for actors shown in the current page.
+   */
+  useEffect(() => {
+    if (!tid || pendingActorIds.length === 0) return;
+    const tenantId: number = tid;
+    let cancelled = false;
+
+    async function loadActorEmails() {
+      const fetched = await Promise.all(
+        pendingActorIds.map(async (userId) => {
+          try {
+            const user = await identityApi.getUser(tenantId, userId);
+            return [userId, user.email] as const;
+          } catch {
+            // Cache null to avoid repeated failed lookups.
+            return [userId, null] as const;
+          }
+        }),
+      );
+
+      if (cancelled) return;
+      setEmailByUserId((prev) => {
+        const next = { ...prev };
+        for (const [userId, email] of fetched) {
+          next[userId] = email;
+        }
+        return next;
+      });
+    }
+
+    void loadActorEmails();
+    return () => {
+      cancelled = true;
+    };
+  }, [tid, pendingActorIds]);
 
   const exportHref = useMemo(() => {
     if (!tid) return null;
@@ -175,7 +259,7 @@ function Inner() {
         <TableHeader>
           <TableRow>
             <TableHead>{t.admin.table.colTimeUtc}</TableHead>
-            <TableHead>{t.admin.table.colActor}</TableHead>
+            <TableHead className="w-[26rem]">{t.admin.table.colActor}</TableHead>
             <TableHead>{t.admin.table.colAction}</TableHead>
             <TableHead>{t.admin.table.colResource}</TableHead>
             <TableHead>{t.admin.table.colResult}</TableHead>
@@ -205,9 +289,14 @@ function Inner() {
               }}
             >
               <TableCell className="font-mono text-xs">
-                {e.created_at?.replace("T", " ").slice(0, 19) ?? "—"}
+                {formatAuditLocalTime(e.created_at)}
               </TableCell>
-              <TableCell>{e.user_id ?? "—"}</TableCell>
+              <TableCell
+                className="max-w-[26rem] truncate"
+                title={formatActorLabel(e.user_id, emailByUserId)}
+              >
+                {formatActorLabel(e.user_id, emailByUserId)}
+              </TableCell>
               <TableCell className="font-mono text-xs">{e.action}</TableCell>
               <TableCell>
                 {e.resource_type
@@ -282,8 +371,7 @@ function AuditDetailDialog({
             {row.action}
           </DialogTitle>
           <DialogDescription>
-            Event {row.id} ·{" "}
-            {row.created_at?.replace("T", " ").slice(0, 19) ?? "unknown time"}
+            Event {row.id} · {formatAuditLocalTime(row.created_at)}
           </DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">

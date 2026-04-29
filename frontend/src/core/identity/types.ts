@@ -260,6 +260,16 @@ export interface UpdateMePayload {
   avatar_url?: string | null;
 }
 
+export interface ChangePasswordPayload {
+  old_password: string;
+  new_password: string;
+}
+
+export interface AdminSetPasswordPayload {
+  email: string;
+  password: string;
+}
+
 // ---------------------------------------------------------------------------
 // Task 5.1c: Org API key management
 // ---------------------------------------------------------------------------

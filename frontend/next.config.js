@@ -57,6 +57,13 @@ const config = {
         source: "/api/langgraph/:path*",
         destination: `${langgraphURL}/:path*`,
       });
+      // Keep Next.js direct access (`:3110`) consistent with nginx (`:2026`):
+      // /api/langgraph-compat/* should be rewritten to gateway /api/*
+      // instead of proxying to a non-existent /api/langgraph-compat/* upstream.
+      rewrites.push({
+        source: "/api/langgraph-compat/:path*",
+        destination: `${gatewayURL}/api/:path*`,
+      });
     }
 
     if (!process.env.NEXT_PUBLIC_BACKEND_BASE_URL) {
