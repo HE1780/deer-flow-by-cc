@@ -266,7 +266,13 @@ def _inject_identity_headers(config: dict[str, Any], request: Request) -> None:
     configurable["headers"] = merged
 
 
-async def _upsert_thread_in_store(store, thread_id: str, metadata: dict | None) -> None:
+async def _upsert_thread_in_store(
+    store,
+    thread_id: str,
+    metadata: dict | None,
+    *,
+    namespace: tuple[str, ...],
+) -> None:
     """Create or refresh the thread record in the Store.
 
     Called from :func:`start_run` so that threads created via the stateless
@@ -277,7 +283,7 @@ async def _upsert_thread_in_store(store, thread_id: str, metadata: dict | None) 
     from app.gateway.routers.threads import _store_upsert
 
     try:
-        await _store_upsert(store, thread_id, metadata=metadata)
+        await _store_upsert(store, thread_id, metadata=metadata, namespace=namespace)
     except Exception:
         logger.warning("Failed to upsert thread %s in store (non-fatal)", thread_id)
 
@@ -287,6 +293,7 @@ async def _sync_thread_title_after_run(
     thread_id: str,
     checkpointer: Any,
     store: Any,
+    namespace: tuple[str, ...],
 ) -> None:
     """Wait for *run_task* to finish, then persist the generated title to the Store.
 
@@ -318,14 +325,14 @@ async def _sync_thread_title_after_run(
         if not title:
             return
 
-        existing = await _store_get(store, thread_id)
+        existing = await _store_get(store, thread_id, namespace=namespace)
         if existing is None:
             return
 
         updated = dict(existing)
         updated.setdefault("values", {})["title"] = title
         updated["updated_at"] = time.time()
-        await _store_put(store, updated)
+        await _store_put(store, updated, namespace=namespace)
         logger.debug("Synced title %r for thread %s", title, thread_id)
     except Exception:
         logger.debug("Failed to sync title for thread %s (non-fatal)", thread_id, exc_info=True)
@@ -352,6 +359,9 @@ async def start_run(
     run_mgr = get_run_manager(request)
     checkpointer = get_checkpointer(request)
     store = get_store(request)
+    from app.gateway.routers.threads import _thread_scope_namespace
+
+    threads_ns = _thread_scope_namespace(request)
 
     disconnect = DisconnectMode.cancel if body.on_disconnect == "cancel" else DisconnectMode.continue_
 
@@ -373,7 +383,12 @@ async def start_run(
     # were never explicitly created via POST /threads (e.g. stateless runs).
     store = get_store(request)
     if store is not None:
-        await _upsert_thread_in_store(store, thread_id, body.metadata)
+        await _upsert_thread_in_store(
+            store,
+            thread_id,
+            body.metadata,
+            namespace=threads_ns,
+        )
 
     agent_factory = resolve_agent_factory(body.assistant_id)
     graph_input = normalize_input(body.input)
@@ -434,7 +449,11 @@ async def start_run(
     # the checkpointer into the Store record so that /threads/search returns the
     # correct title instead of an empty values dict.
     if store is not None:
-        asyncio.create_task(_sync_thread_title_after_run(task, thread_id, checkpointer, store))
+        asyncio.create_task(
+            _sync_thread_title_after_run(
+                task, thread_id, checkpointer, store, namespace=threads_ns
+            )
+        )
 
     return record
 

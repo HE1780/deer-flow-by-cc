@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -6,6 +7,42 @@ from fastapi.testclient import TestClient
 
 from app.gateway.routers import threads
 from deerflow.config.paths import Paths
+
+
+class _FakeStore:
+    """Minimal async store stub used by thread router tests."""
+
+    def __init__(self):
+        self._data: dict[tuple[tuple[str, ...], str], dict] = {}
+
+    async def aput(self, namespace, key, value):
+        self._data[(tuple(namespace), key)] = dict(value)
+
+    async def aget(self, namespace, key):
+        value = self._data.get((tuple(namespace), key))
+        if value is None:
+            return None
+        return SimpleNamespace(value=value)
+
+    async def asearch(self, namespace, limit=10_000):
+        ns = tuple(namespace)
+        rows = [
+            SimpleNamespace(value=value)
+            for (stored_ns, _), value in self._data.items()
+            if stored_ns == ns
+        ]
+        return rows[:limit]
+
+    async def adelete(self, namespace, key):
+        self._data.pop((tuple(namespace), key), None)
+
+
+class _FakeCheckpointer:
+    """Minimal checkpointer stub with empty history by default."""
+
+    async def alist(self, _config):
+        if False:  # pragma: no cover - required to keep this an async generator
+            yield None
 
 
 def test_delete_thread_data_removes_thread_directory(tmp_path):
@@ -177,3 +214,95 @@ class TestDeleteThreadDataTenantAware:
 
         assert response.status_code == 200
         assert not tenant_dir.exists()
+
+
+def test_search_threads_scoped_namespace_prevents_cross_user_leak():
+    """Authenticated search only returns records from caller's scoped namespace."""
+    app = FastAPI()
+    app.include_router(threads.router)
+    app.state.checkpointer = _FakeCheckpointer()
+    app.state.store = _FakeStore()
+
+    own_ns = ("threads", "tenant:1", "workspace:10", "user:101")
+    other_ns = ("threads",)
+
+    @app.middleware("http")
+    async def _stub_identity(request, call_next):
+        request.state.identity = SimpleNamespace(
+            user_id=101,
+            tenant_id=1,
+            workspace_id=10,
+            is_authenticated=True,
+        )
+        return await call_next(request)
+
+    import asyncio
+
+    asyncio.run(
+        app.state.store.aput(
+            own_ns,
+            "own-thread",
+            {
+                "thread_id": "own-thread",
+                "status": "idle",
+                "created_at": "2026-04-29T00:00:00+00:00",
+                "updated_at": "2026-04-29T00:00:00+00:00",
+                "metadata": {},
+                "values": {},
+            },
+        )
+    )
+    asyncio.run(
+        app.state.store.aput(
+            other_ns,
+            "foreign-thread",
+            {
+                "thread_id": "foreign-thread",
+                "status": "idle",
+                "created_at": "2026-04-29T00:00:00+00:00",
+                "updated_at": "2026-04-29T00:00:00+00:00",
+                "metadata": {},
+                "values": {},
+            },
+        )
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/threads/search", json={"limit": 50, "offset": 0})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [row["thread_id"] for row in payload] == ["own-thread"]
+
+
+def test_search_threads_scoped_mode_skips_global_checkpointer_scan():
+    """Scoped identity mode must not scan global checkpointer history."""
+    app = FastAPI()
+    app.include_router(threads.router)
+    app.state.store = _FakeStore()
+
+    class _LeakyCheckpointer:
+        async def alist(self, _config):
+            yield SimpleNamespace(
+                config={"configurable": {"thread_id": "foreign-thread", "checkpoint_ns": ""}},
+                metadata={"created_at": "2026-04-29T00:00:00+00:00"},
+                checkpoint={"channel_values": {"title": "foreign"}},
+            )
+
+    app.state.checkpointer = _LeakyCheckpointer()
+
+    @app.middleware("http")
+    async def _stub_identity(request, call_next):
+        request.state.identity = SimpleNamespace(
+            user_id=101,
+            tenant_id=1,
+            workspace_id=10,
+            is_authenticated=True,
+        )
+        return await call_next(request)
+
+    with TestClient(app) as client:
+        response = client.post("/api/threads/search", json={"limit": 50, "offset": 0})
+
+    assert response.status_code == 200
+    assert response.json() == []
