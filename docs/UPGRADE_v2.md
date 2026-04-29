@@ -1,8 +1,12 @@
 # DeerFlow v2 Upgrade Guide
 
+> 📌 **2026-04-29 验收复核**：本指南内容仍然准确反映当前代码事实。若干部署演练 gap（OIDC 真机、1000-thread 迁移、双副本 bootstrap、各部署形态）尚未完成，详见 [OPEN_ISSUES.md OI-8 ~ OI-13](./OPEN_ISSUES.md) + [identity-release-checklist.md](./identity-release-checklist.md) 的 38 项未勾选项。Spec 锚点已归档到 [`superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`](./superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md)。
+
+---
+
 This guide documents the upgrade path from DeerFlow v1.x (single-tenant) to
 v2.0 (multi-tenant identity foundation). Spec reference:
-`docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md`,
+[`docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`](./superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md),
 sections §10.2 and §10.10.
 
 ## TL;DR

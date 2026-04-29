@@ -1,3 +1,9 @@
+> 📦 **归档于 2026-04-29 — 根因报告，作为历史档案保留**
+>
+> Gateway mode 修复已 ship（main_loop helper），Standard mode 仍是已知限制 — 见 [OPEN_ISSUES.md OI-3](../../../OPEN_ISSUES.md)。
+
+---
+
 # Event Loop is Closed — 根因报告（草稿）
 
 **状态：** Gateway mode 已闭环（main-loop reuse 改造，见 [`2026-04-28-llm-event-loop-closed-design.md`](./2026-04-28-llm-event-loop-closed-design.md)）；Standard mode 文档化为已知限制（见 backend/CLAUDE.md Runtime Modes 章节）。

@@ -1,7 +1,11 @@
+> 📦 **归档于 2026-04-29** — Gateway mode 主线已 ship（[main_loop.py](../../../../backend/packages/harness/deerflow/runtime/main_loop.py)，merge `c769a210`）。Standard mode 已知限制 + LLM 错误可观测性补丁未跑见 [OPEN_ISSUES.md OI-2 / OI-3](../../../OPEN_ISSUES.md)。
+
+---
+
 # Event Loop is Closed —— Design Spec
 
 **关联根因报告：** [`2026-04-28-llm-event-loop-closed-rootcause.md`](./2026-04-28-llm-event-loop-closed-rootcause.md)
-**状态：** 待用户 review；通过后进 writing-plans
+**状态：** ✅ 设计已采纳并交付（详见上方 banner）
 **作者：** Claude (Opus 4.7) + 用户协作
 **日期：** 2026-04-28
 

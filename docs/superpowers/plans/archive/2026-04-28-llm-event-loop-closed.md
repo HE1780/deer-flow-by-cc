@@ -1,3 +1,15 @@
+> 📦 **归档于 2026-04-29 — Gateway mode 已 ship；Standard mode 文档化为已知限制**
+>
+> **当前事实（Gateway mode）**：`deerflow.runtime.main_loop` 已落地（[main_loop.py](../../../../backend/packages/harness/deerflow/runtime/main_loop.py)）。`set_main_loop` + `submit_to_main_loop` 复用 Uvicorn 主 loop，memory updater 与 subagent executor 已切走 ephemeral loop（merge commit `c769a210`）。
+>
+> **未闭环**：
+> 1. Standard mode（`make dev`）下 LLM `Event loop is closed` bug 仍存在 — 已在 [backend/CLAUDE.md](../../../../backend/CLAUDE.md) Runtime Modes 段文档化为已知限制，**生产推荐 Gateway mode**。详见 [OPEN_ISSUES.md OI-3](../../../OPEN_ISSUES.md)。
+> 2. LLM 错误可观测性补丁（本 plan §4.5）的实施状态待复核 — 详见 [OPEN_ISSUES.md OI-2](../../../OPEN_ISSUES.md)。
+>
+> 下文为施工时的原始 plan，仅作历史档案保留。
+
+---
+
 # LLM Event Loop is Closed —— Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

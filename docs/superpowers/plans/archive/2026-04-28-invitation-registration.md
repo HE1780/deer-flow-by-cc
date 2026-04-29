@@ -1,3 +1,14 @@
+> 📦 **归档于 2026-04-29 — 实施未启动（待讨论是否纳入下一期）**
+>
+> **当前事实**：
+> - **代码全部未动**：`backend/app/gateway/identity/models/invitation.py` MISSING，无 Alembic 0006 迁移，`auth.py` 无 `/register` 端点，`admin_writes.py` 无 invitations 三端点。
+> - 设计 + plan 完整可执行，依赖项（M2 password_login + bcrypt + session）已就绪。
+> - 见 [OPEN_ISSUES.md OI-4](../../../OPEN_ISSUES.md) — 待讨论是否纳入下一期。
+>
+> 下文为原始 plan，可直接拾取执行。
+
+---
+
 # Invitation-Based User Registration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

@@ -241,7 +241,7 @@ Once enabled, users sign in at `/api/auth/oidc/{provider}/login`, receive an Htt
 
 **Audit (M6):** every authenticated write, every authorization denial, every login/logout, and every tool denial reported by the LangGraph runtime is captured by the `AuditMiddleware` + `AuditBatchWriter` pipeline and persisted to `identity.audit_logs`. `GET /api/tenants/{tid}/audit` returns paginated rows (default 7-day / max 90-day window, base64url cursor); `GET /api/tenants/{tid}/audit/export` streams CSV (hard-capped at 100k rows). Sensitive fields (passwords, tokens, secrets, request bodies) are scrubbed before enqueue; `write_file` calls keep `path`+`size` only. When Postgres is unreachable, **critical** events (logins, RBAC denies, role grants) fall back to `$DEER_FLOW_HOME/_audit/fallback.jsonl` and are backfilled on the next successful flush — non-critical events are dropped with a metric. The `audit_logs` table is locked down at the DB layer: the `deerflow` app role only has `INSERT, SELECT` (the alembic migration `20260421_0003_audit_grants.py` enforces this; superuser deploys aren't affected by GRANT). Run `app.gateway.identity.audit.retention.run_retention_job(...)` (or wire it via `start_retention_task`) to archive rows older than 90 days into gzip JSONL under `{archive_dir}/{tenant_id}/{yyyy-mm}.jsonl.gz` and delete them from PG.
 
-Full roadmap and design: [`docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md`](docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md).
+Full roadmap and design: [`docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`](docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md).
 
 ### Running the Application
 

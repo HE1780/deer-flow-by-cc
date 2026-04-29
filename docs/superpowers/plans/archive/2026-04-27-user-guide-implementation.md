@@ -1,3 +1,15 @@
+> 📦 **归档于 2026-04-29 — 正文完成；截图全缺；09 章部分内容已过时**
+>
+> **当前事实**：
+> - **正文已写**：[docs/user-guide/](../../../user-guide/) 下 9 章 + README 全部完成（约 599 行）。
+> - **截图全缺**：[docs/user-guide/images/](../../../user-guide/images/) 目录为空（仅 `.gitkeep`）。
+> - **09 章过时**：原稿"已知限制"包含若干已 ship 项（`/admin/tenants/[id]` 真页面已上线、`/admin/users/[id]` 同；`/admin/workspaces/[id]/members` 已可用）— 详见 [OPEN_ISSUES.md OI-6](../../../OPEN_ISSUES.md)。
+> - **01-06 章准确性待复核**：写于 admin nav 改造前；07-08 章已与当前 admin 路由一致。
+>
+> 下文为原始 plan，仅作历史档案保留。
+
+---
+
 # DeerFlow 用户使用手册 — 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

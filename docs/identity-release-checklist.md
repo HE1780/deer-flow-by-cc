@@ -1,5 +1,11 @@
 # Identity v2 Release Checklist
 
+> 📌 **2026-04-29 状态**：本清单 38 项 `- [ ]` 全部未勾选 — 这不是代码 bug，是部署/发布演练缺位。归类汇总见 [OPEN_ISSUES.md "验收 gap 清单"](./OPEN_ISSUES.md#验收-gap-清单38-项手工演练)。
+>
+> 进入下一期发布周期时，建议把这 38 项拆成"必跑"（阻塞）/"强烈建议"两组，参见 OPEN_ISSUES 文末讨论方向。
+
+---
+
 Manual runbook that must be exercised on staging once before a v2
 production rollout. Spec §11.7.
 

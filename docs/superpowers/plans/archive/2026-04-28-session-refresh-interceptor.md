@@ -1,3 +1,13 @@
+> 📦 **归档于 2026-04-29 — 已 ship**
+>
+> **当前事实**：401 refresh+retry interceptor 已合并到 `cc-main`（merge commit `d6497326`）。`identityFetch` singleflight 行为在 [frontend/src/core/identity/fetcher.ts](../../../../frontend/src/core/identity/fetcher.ts) line 41-128 实现，9 个 vitest 全绿。
+>
+> **遗留议题**：LangGraph SDK 直连路径（`/api/langgraph/*`）当前不走 identityFetch 拦截器，已知容忍 — 详见 [OPEN_ISSUES.md](../../../OPEN_ISSUES.md)。
+>
+> 下文为施工时的原始 plan，仅作历史档案保留。
+
+---
+
 # Session Refresh Interceptor — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

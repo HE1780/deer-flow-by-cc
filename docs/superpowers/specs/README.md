@@ -1,31 +1,45 @@
 # Design Specs Index
 
-This directory tracks **active** design specs. Closed specs live under [`archive/`](./archive/).
-
-A spec is the design artifact a [`plan`](../plans/) consumes. Most specs and plans are 1:1; some specs (the P0 identity foundation) span multiple plans.
-
----
-
-## Active specs
-
-| Spec | Scope | Status | Companion plan |
-|---|---|---|---|
-| [2026-04-21-deerflow-identity-foundation-design](./2026-04-21-deerflow-identity-foundation-design.md) | Multi-tenant identity, RBAC, storage isolation, LangGraph guardrail, audit. **Anchor doc for v2 enterprise identity.** | **kept · long-term reference** — P0 (M1-M7) shipped; remains the source of truth for v2 invariants and the entry point for P1 (fine-grained RBAC), P2 (KB), P3 (SkillHub), P4 (collab), P5 (workflow editor) | M1-M7 plans (all archived) |
-| [2026-04-27-custom-agent-edit-page-design](./2026-04-27-custom-agent-edit-page-design.md) | Agent edit form + tool-groups endpoint design | **open · actionable** — 2026-04-28 复核：UI/hook/test 全部未落地，backend 仅 PUT 字段就绪缺 `GET /api/tool-groups`；预计 2-4h 实施 | [custom-agent-edit-page](../plans/2026-04-27-custom-agent-edit-page.md) |
-| [2026-04-27-loop-detection-orphan-tool-msg](./2026-04-27-loop-detection-orphan-tool-msg.md) | P1 bug: `LoopDetectionMiddleware.hard_stop` clears `tool_calls` but leaves orphan `ToolMessage` history → MiniMax/Anthropic 400 on next call | **open · actionable** — spec 自带实施指引（坐标 + 工作量估算），可立即写 plan；优先级低于自托管 epic | _none yet — 见 spec 末尾"实施指引"块_ |
-| [2026-04-27-user-guide-design](./2026-04-27-user-guide-design.md) | 9-chapter user guide structure + role definitions + TOC | **open · 内容完成 · 仅缺截图** — 9 章正文 + README ~599 行已实质完成；剩余只有 10+ 张截图补全 + 01-06 章 UI 改动后回访复核 | [user-guide-implementation](../plans/2026-04-27-user-guide-implementation.md) |
+> 📦 **2026-04-29 — 全部归档收尾**
+>
+> 当前阶段所有 design spec 均已 `git mv` 到 [`archive/`](./archive/)。仍未闭环的开放议题统一归集到 [`docs/OPEN_ISSUES.md`](../../OPEN_ISSUES.md)，已交付的功能总览见 [`docs/SYSTEM_WHITEPAPER.md`](../../SYSTEM_WHITEPAPER.md)。
+>
+> 本 README 保留作目录索引；下一期开新 spec 时仍按 `YYYY-MM-DD-<short-name>.md` 命名直接落到本目录即可。
 
 ---
 
-## Archived specs
+## 命名约定
 
-All under [`archive/`](./archive/). Archived 2026-04-28 alongside their companion plans.
+- 一个 spec ≈ 一个 [plan](../plans/) 的设计输入。文件名 `YYYY-MM-DD-<short-name>.md`。
+- 多数 spec 与 plan 1:1；P0 identity foundation 是个例外，跨多个 plan。
+- 关闭后 `git mv` 到 `archive/`（不删除）。
+
+## 归档总览
+
+`archive/` 当前共 16 个 spec，分两批：
+
+### 批次 A — 2026-04-28 与 P0 一同归档
 
 | Spec | Companion plan |
 |---|---|
 | [channels-identity-ci-smoke-design](./archive/2026-04-24-channels-identity-ci-smoke-design.md) | [channels-identity-ci-smoke](../plans/archive/2026-04-25-channels-identity-ci-smoke.md) |
 | [m7a-deferred-items-design](./archive/2026-04-24-m7a-deferred-items-design.md) | [m7a-deferred-items](../plans/archive/2026-04-24-m7a-deferred-items.md) |
-| [skill-agent-i18n-design](./archive/2026-04-25-skill-agent-i18n-design.md) | [agent-fix-i18n](../plans/archive/2026-04-25-agent-fix-i18n.md) (closed) + [agent-skill-version-pin](../plans/2026-04-25-agent-skill-version-pin.md) (still active) |
+| [skill-agent-i18n-design](./archive/2026-04-25-skill-agent-i18n-design.md) | [agent-fix-i18n](../plans/archive/2026-04-25-agent-fix-i18n.md) + [agent-skill-version-pin](../plans/archive/2026-04-25-agent-skill-version-pin.md) |
 | [skill-mgmt-v2-complete-design](./archive/2026-04-25-skill-mgmt-v2-complete-design.md) | [skill-mgmt-v2-remaining](../plans/archive/2026-04-25-skill-mgmt-v2-remaining.md) |
-| [p0-original-scope-audit](./archive/2026-04-27-p0-original-scope-audit.md) | _no plan — retrospective audit doc_ |
-| [skill-slash-prefix-display](./archive/2026-04-27-skill-slash-prefix-display.md) | _no plan — shipped via `feat(skills): show "/skill-name" badge"` commits_ |
+| [p0-original-scope-audit](./archive/2026-04-27-p0-original-scope-audit.md) | _retrospective audit_ |
+| [skill-slash-prefix-display](./archive/2026-04-27-skill-slash-prefix-display.md) | _no plan_ |
+
+### 批次 B — 2026-04-29 验收阶段归档
+
+| Spec | 当前事实 |
+|---|---|
+| [deerflow-identity-foundation-design](./archive/2026-04-21-deerflow-identity-foundation-design.md) | ✅ P0 已 ship · 长期参考（v2 不变量 + P1+ 路线图） |
+| [custom-agent-edit-page-design](./archive/2026-04-27-custom-agent-edit-page-design.md) | ✅ 已 ship |
+| [loop-detection-orphan-tool-msg](./archive/2026-04-27-loop-detection-orphan-tool-msg.md) | ✅ hard_stop 已 ship；warning → [OPEN_ISSUES OI-1](../../OPEN_ISSUES.md) |
+| [user-guide-design](./archive/2026-04-27-user-guide-design.md) | 🟡 正文完成 / 截图缺 → [OPEN_ISSUES OI-6](../../OPEN_ISSUES.md) |
+| [llm-event-loop-closed-design](./archive/2026-04-28-llm-event-loop-closed-design.md) | ✅ Gateway mode 已 ship；Standard mode → [OPEN_ISSUES OI-3](../../OPEN_ISSUES.md) |
+| [llm-event-loop-closed-rootcause](./archive/2026-04-28-llm-event-loop-closed-rootcause.md) | 根因报告，作为历史档案 |
+| [uploads-tenant-aware-design](./archive/2026-04-28-uploads-tenant-aware-design.md) | ✅ 已 ship |
+| [workspace-outputs-dual-dir-loop](./archive/2026-04-28-workspace-outputs-dual-dir-loop.md) | ✅ 已 ship |
+| [session-refresh-interceptor-design](./archive/2026-04-28-session-refresh-interceptor-design.md) | ✅ 已 ship |
+| [invitation-registration-design](./archive/2026-04-28-invitation-registration-design.md) | 🟡 实施未启动 → [OPEN_ISSUES OI-4](../../OPEN_ISSUES.md) |

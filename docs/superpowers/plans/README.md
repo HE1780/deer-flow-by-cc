@@ -1,58 +1,62 @@
 # Implementation Plans Index
 
-This directory tracks **active** implementation plans. Closed plans live under [`archive/`](./archive/).
-
-Conventions:
-
-- One plan = one shippable scope. Filename pattern: `YYYY-MM-DD-<short-name>.md`.
-- A plan moves to `archive/` when its goal is shipped (and any deferred sub-tasks are explicitly recorded as such).
-- The corresponding design lives in [`../specs/`](../specs/); same naming convention with archive mirror.
+> 📦 **2026-04-29 — 全部归档收尾**
+>
+> 当前阶段所有已编写的 implementation plan 均已 `git mv` 到 [`archive/`](./archive/)。仍未闭环的开放议题（含未启动的 plan）统一归集到 [`docs/OPEN_ISSUES.md`](../../OPEN_ISSUES.md)，已交付的功能总览见 [`docs/SYSTEM_WHITEPAPER.md`](../../SYSTEM_WHITEPAPER.md)。
+>
+> 本 README 保留作目录索引；下一期开新 plan 时仍按 `YYYY-MM-DD-<short-name>.md` 命名直接落到本目录即可。
 
 ---
 
-## Active plans
+## 命名约定
 
-| Plan | Scope | Status | Spec |
-|---|---|---|---|
-| [2026-04-25-agent-skill-version-pin](./2026-04-25-agent-skill-version-pin.md) | `name@version` skill pinning + `manifest.yaml` parser, auto-merge tool_groups + env at agent build | **open · actionable** — depends on agent-fix-i18n (shipped); not started | [skill-agent-i18n-design](../specs/archive/2026-04-25-skill-agent-i18n-design.md) (shared) |
-| [2026-04-27-custom-agent-edit-page](./2026-04-27-custom-agent-edit-page.md) | Backend agent CRUD + tool-groups endpoint + frontend edit form | **open · actionable** — 2026-04-28 复核确认前端 UI/hook/i18n/test 全部未落地，backend 仅缺 `GET /api/tool-groups`；TDD-level plan ~10 个 task，预计 2-4h agentic | [custom-agent-edit-page-design](../specs/2026-04-27-custom-agent-edit-page-design.md) |
-| [2026-04-27-user-guide-implementation](./2026-04-27-user-guide-implementation.md) | 9-chapter end-user manual under `docs/user-guide/` with happy-path verification | **open · 内容完成 · 仅缺截图** — 9 章 + README ~599 行已实质完成；剩余仅 10+ 张截图补全 + 01-06 章 UI 改动后回访复核 | [user-guide-design](../specs/2026-04-27-user-guide-design.md) |
+- 一个 plan = 一个可发布范围。文件名：`YYYY-MM-DD-<short-name>.md`。
+- 关闭后 `git mv` 到 `archive/`（不删除），保留 PR 链接历史。
+- 对应的 design 在同名 [`../specs/`](../specs/) 中，归档目录镜像。
 
-Long-term / parking lot (no plan, but tracked elsewhere):
+## 归档总览
 
-- **Self-hosting epic** — docker-compose / Helm / offline images / install docs. No plan file yet; the next major epic. See memory `project_self_hosted_positioning.md`.
-- **P1 bug: LoopDetectionMiddleware orphan ToolMessage** — spec at [`../specs/2026-04-27-loop-detection-orphan-tool-msg.md`](../specs/2026-04-27-loop-detection-orphan-tool-msg.md); plan to be written. spec 末尾"实施指引"块已给出文件:行号坐标 + 30 行编码 + 50 行测试的工作量估算，下一个写 plan 的工程师可直接拾取。
+`archive/` 当前共 21 个 plan，分两批：
 
----
+### 批次 A — P0 identity foundation（M1-M7）
 
-## Archived plans (P0 identity foundation + follow-up)
+2026-04-28 在 P0 闭环时一次性归档：
 
-All under [`archive/`](./archive/). Archived 2026-04-28 once `M1-M7` and the M7A follow-on items shipped on `main`.
-
-| Plan | Shipped scope |
+| Plan | 已交付 |
 |---|---|
-| [m1-schema-bootstrap-feature-flag](./archive/2026-04-21-m1-schema-bootstrap-feature-flag.md) | Identity schema + Alembic + ORM + bootstrap + `ENABLE_IDENTITY` flag + pg/redis compose + CI |
-| [m2-authentication](./archive/2026-04-21-m2-authentication.md) | OIDC + internal JWT + API tokens + Redis sessions + login lockout + `/auth/*` + `/me` |
-| [m3-rbac-middleware](./archive/2026-04-21-m3-rbac-middleware.md) | `@requires` decorator + tenant auto-filter + horizontal-access matrix + roles/perms reads |
-| [m4-storage-isolation](./archive/2026-04-21-m4-storage-isolation.md) | Tenant/workspace paths + tenant-aware skills loader + 3-layer config merge + sandbox + artifacts authz |
-| [m5-langgraph-identity-guardrail](./archive/2026-04-21-m5-langgraph-identity-guardrail.md) | HMAC identity headers Gateway→LangGraph + IdentityMiddleware + GuardrailMiddleware + subagent inheritance |
-| [m6-audit](./archive/2026-04-21-m6-audit.md) | AuditMiddleware + async batch writer + JSONL fallback + query/export + retention + immutability GRANT |
-| [m7-admin-ui-migration-release](./archive/2026-04-21-m7-admin-ui-migration-release.md) | 14 admin pages + Playwright E2E + migration script + multi-replica bootstrap lock + metrics + release guide |
-| [m7a-admin-ui](./archive/2026-04-23-m7a-admin-ui.md) + [-A2](./archive/2026-04-23-m7a-admin-ui-A2.md) | Admin shell + read-only pages (A1 + A2 sub-PRs) |
-| [m7a-deferred-items](./archive/2026-04-24-m7a-deferred-items.md) | M7A deferred follow-ups (RBAC matrix E2E, creates, zod, i18n) — 53/53 steps shipped |
-| [agent-fix-i18n](./archive/2026-04-25-agent-fix-i18n.md) | Agent name configurable injection + i18n baseline |
-| [channels-identity-ci-smoke](./archive/2026-04-25-channels-identity-ci-smoke.md) | Channels tenant/workspace threading + CI smoke workflow |
-| [skill-mgmt-v2-remaining](./archive/2026-04-25-skill-mgmt-v2-remaining.md) | Thread skill bind/unbind endpoints + badge UI + admin tabs |
-| [identity-langgraph-passthrough-bug](./archive/2026-04-27-identity-langgraph-passthrough-bug.md) | P0 fix: HMAC bypass via direct LangGraph; default frontend to `/api/langgraph-compat`; Tasks 4–5 deferred to self-host epic |
+| [m1-schema-bootstrap-feature-flag](./archive/2026-04-21-m1-schema-bootstrap-feature-flag.md) | identity schema + Alembic + ORM + bootstrap + `ENABLE_IDENTITY` |
+| [m2-authentication](./archive/2026-04-21-m2-authentication.md) | OIDC + JWT + API tokens + Redis sessions + lockout + `/auth/*` + `/me` |
+| [m3-rbac-middleware](./archive/2026-04-21-m3-rbac-middleware.md) | `@requires` + tenant auto-filter + roles/perms 读 |
+| [m4-storage-isolation](./archive/2026-04-21-m4-storage-isolation.md) | tenant 路径 + skills 加载 + 三层 config + sandbox + artifacts authz |
+| [m5-langgraph-identity-guardrail](./archive/2026-04-21-m5-langgraph-identity-guardrail.md) | HMAC 头 + IdentityMiddleware + GuardrailMiddleware + subagent 继承 |
+| [m6-audit](./archive/2026-04-21-m6-audit.md) | AuditMiddleware + 异步 batch writer + JSONL fallback + 查询/导出 + 保留 + immutability |
+| [m7-admin-ui-migration-release](./archive/2026-04-21-m7-admin-ui-migration-release.md) | 14 admin 页 + Playwright + 迁移 + 多副本锁 + metrics |
+| [m7a-admin-ui](./archive/2026-04-23-m7a-admin-ui.md) + [-A2](./archive/2026-04-23-m7a-admin-ui-A2.md) | Admin shell + 只读页 |
+| [m7a-deferred-items](./archive/2026-04-24-m7a-deferred-items.md) | RBAC 矩阵 E2E、creates、zod、i18n |
+| [agent-fix-i18n](./archive/2026-04-25-agent-fix-i18n.md) | agent_name 注入 + i18n 基线 |
+| [channels-identity-ci-smoke](./archive/2026-04-25-channels-identity-ci-smoke.md) | channels 多租户 + CI smoke |
+| [skill-mgmt-v2-remaining](./archive/2026-04-25-skill-mgmt-v2-remaining.md) | thread skill bind/unbind + badge UI + admin tabs |
+| [identity-langgraph-passthrough-bug](./archive/2026-04-27-identity-langgraph-passthrough-bug.md) | P0 fix: HMAC bypass; default `/api/langgraph-compat` |
+
+### 批次 B — 验收阶段归档（2026-04-29）
+
+| Plan | 状态（核对当前代码） |
+|---|---|
+| [agent-skill-version-pin](./archive/2026-04-25-agent-skill-version-pin.md) | ✅ 已 ship — manifest 解析 + version pin + `org_key_env` |
+| [custom-agent-edit-page](./archive/2026-04-27-custom-agent-edit-page.md) | ✅ 已 ship — edit page + `GET /api/tool-groups` + tri-state helper |
+| [llm-event-loop-closed](./archive/2026-04-28-llm-event-loop-closed.md) | ✅ Gateway mode 已 ship；Standard mode → [OPEN_ISSUES OI-3](../../OPEN_ISSUES.md) |
+| [loop-detection-orphan-tool-msg](./archive/2026-04-28-loop-detection-orphan-tool-msg.md) | ✅ hard_stop 已 ship；warning → [OPEN_ISSUES OI-1](../../OPEN_ISSUES.md) |
+| [session-refresh-interceptor](./archive/2026-04-28-session-refresh-interceptor.md) | ✅ 已 ship — 9 vitest 全绿 |
+| [uploads-tenant-aware](./archive/2026-04-28-uploads-tenant-aware.md) | ✅ 已 ship — 5 处 call site 全部修复 |
+| [user-guide-implementation](./archive/2026-04-27-user-guide-implementation.md) | 🟡 正文完成 / 截图待补 → [OPEN_ISSUES OI-6](../../OPEN_ISSUES.md) |
+| [invitation-registration](./archive/2026-04-28-invitation-registration.md) | 🟡 实施未启动（设计完整）→ [OPEN_ISSUES OI-4](../../OPEN_ISSUES.md) |
 
 ---
 
-## Cross-plan invariants (load-bearing for any plan touching identity)
+## 跨 plan 不变量（identity 启用时永远成立）
 
-These invariants MUST hold across the lifetime of `ENABLE_IDENTITY=true`; regressing one is a hard failure:
-
-1. **`ENABLE_IDENTITY=false` ⇒ zero behavior change from pre-M1 main.** Regression guard: `backend/tests/identity/test_feature_flag_offline.py`.
-2. **Harness boundary.** No code in `backend/packages/harness/deerflow/` imports from `app.*`. Enforced by `backend/tests/test_harness_boundary.py`.
-3. **Audit log immutability.** DB GRANT denies UPDATE/DELETE on `identity.audit_logs`.
-4. **Identity-derived paths.** No business code computes a storage path from untrusted user input; must go through `app/gateway/identity/storage/paths.py`.
-5. **Tool permission whitelist.** `TOOL_PERMISSION_MAP` + MCP-declared permissions are the only allow paths; unknown tools default-deny.
+1. **`ENABLE_IDENTITY=false` 行为零变化**。守卫：[backend/tests/identity/test_feature_flag_offline.py](../../../backend/tests/identity/test_feature_flag_offline.py)。
+2. **Harness 边界**：`backend/packages/harness/deerflow/` 不能 `import app.*`。守卫：[backend/tests/test_harness_boundary.py](../../../backend/tests/test_harness_boundary.py)。
+3. **审计日志不可变**：DB GRANT 拒绝对 `identity.audit_logs` 的 UPDATE/DELETE。
+4. **路径不可越界**：业务代码不直接拼路径，全部走 [storage/paths.py](../../../backend/app/gateway/identity/storage/paths.py)。
+5. **工具权限白名单**：`TOOL_PERMISSION_MAP` + MCP 声明的 `required_permission` 是唯一允许路径，未登记的工具默认拒绝。

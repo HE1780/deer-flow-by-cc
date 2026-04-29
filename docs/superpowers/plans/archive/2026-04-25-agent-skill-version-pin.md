@@ -1,8 +1,22 @@
+> 📦 **归档于 2026-04-29 — 已 ship（核心 3 个 task 全部落地）**
+>
+> **当前事实**：
+> - `manifest.yaml` 解析器已落地（[manifest.py](../../../../backend/packages/harness/deerflow/skills/manifest.py)，commit `2f640f49`）。
+> - `AgentConfig.org_key_env` + `_resolve_skills_and_deps()` 已落地（commit `b17c7709`）。
+> - 前端 Agent API 字段（`skills` + `org_key_env`）已扩展（commit `85debb76`）。
+> - 10 项单测全绿。
+>
+> **遗留**：仅手工 manifest+对话验证未跑（plan §验证清单后两项），不影响功能上线。
+>
+> 下文为原始 plan，仅作历史档案保留。
+
+---
+
 # Agent Skill Version Pin + manifest.yaml 实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**状态：** open · actionable — 依赖（agent-fix-i18n）已 ship，本计划尚未启动；可随时领走执行
+**状态：** ✅ 已 ship（详见上方 banner）— 依赖（agent-fix-i18n）已 ship
 **优先级：** 低于自托管 epic
 **关联 spec：** [../specs/archive/2026-04-25-skill-agent-i18n-design.md](../specs/archive/2026-04-25-skill-agent-i18n-design.md)（共享设计）
 

@@ -40,4 +40,4 @@ DeerFlow 是一个开源的 super agent harness：你可以把它想成一个能
 
 ## 反馈
 
-发现文档与实际行为不一致？欢迎在仓库提 issue 或直接发 PR。本手册的设计稿见 [docs/superpowers/specs/2026-04-27-user-guide-design.md](../superpowers/specs/2026-04-27-user-guide-design.md)。
+发现文档与实际行为不一致？欢迎在仓库提 issue 或直接发 PR。本手册的设计稿见 [docs/superpowers/specs/archive/2026-04-27-user-guide-design.md](../superpowers/specs/archive/2026-04-27-user-guide-design.md)。

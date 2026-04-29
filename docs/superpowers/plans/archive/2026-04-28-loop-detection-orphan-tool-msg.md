@@ -1,3 +1,13 @@
+> 📦 **归档于 2026-04-29 — hard_stop 路径已 ship；warning 路径仍 open**
+>
+> **当前事实（hard_stop）**：[loop_detection_middleware.py](../../../../backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py) line 508-516 的 `RemoveMessage(id=m.id)` 已经在生产环境清理 hard_stop 触发时的孤儿 ToolMessage。
+>
+> **未闭环（warning 路径）**：本 plan 只覆盖 hard_stop 分支。warning 分支（line 373-380）仍然在工具调用链中间注入 `HumanMessage(content=warning)`，已实证导致 thread `336b7fce-...` 永久损坏 — 详见 [OPEN_ISSUES.md OI-1](../../../OPEN_ISSUES.md) + [docs/lessons.md 2026-04-28 复盘](../../../lessons.md)。
+>
+> 下文为 hard_stop 修复的原始 plan，仅作历史档案保留。
+
+---
+
 # LoopDetectionMiddleware 孤儿 ToolMessage 修复 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

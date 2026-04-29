@@ -1,6 +1,10 @@
+> 📦 **归档于 2026-04-29 — 实施未启动**：代码全部未动（`models/invitation.py` MISSING，无 0006 迁移，`/register` + invitations 三端点均无）。设计 + plan 完整可执行。详见 [OPEN_ISSUES.md OI-4](../../../OPEN_ISSUES.md)。
+
+---
+
 # 邀请制一般用户注册 — 设计方案
 
-> 状态：待评审 | 日期：2026-04-28 | 关联计划：`docs/superpowers/plans/2026-04-28-invitation-registration.md`
+> 状态：🟡 设计已冻结 / 实施未启动（详见上方 banner） | 日期：2026-04-28 | 关联计划：[../../plans/archive/2026-04-28-invitation-registration.md](../../plans/archive/2026-04-28-invitation-registration.md)
 
 ## 1. 需求描述
 

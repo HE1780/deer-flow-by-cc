@@ -131,8 +131,8 @@ plus `\|`-alternation easily masks one of them).
 
 **Related artefacts:**
 
-* Spec: [`docs/superpowers/specs/2026-04-28-uploads-tenant-aware-design.md`](superpowers/specs/2026-04-28-uploads-tenant-aware-design.md)
-* Plan: [`docs/superpowers/plans/2026-04-28-uploads-tenant-aware.md`](superpowers/plans/2026-04-28-uploads-tenant-aware.md)
+* Spec: [`docs/superpowers/specs/archive/2026-04-28-uploads-tenant-aware-design.md`](superpowers/specs/archive/2026-04-28-uploads-tenant-aware-design.md)
+* Plan: [`docs/superpowers/plans/archive/2026-04-28-uploads-tenant-aware.md`](superpowers/plans/archive/2026-04-28-uploads-tenant-aware.md)
 * Memory: `feedback_cross_cutting_api_migration.md`
 
 ## 2026-04-28: "假死循环" 先排查 max_tokens,再排查 prompt/检测器
@@ -163,5 +163,5 @@ plus `\|`-alternation easily masks one of them).
 
 **Related artefacts:**
 
-* Spec: [`docs/superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md`](superpowers/specs/2026-04-28-workspace-outputs-dual-dir-loop.md)(排查附录节)
+* Spec: [`docs/superpowers/specs/archive/2026-04-28-workspace-outputs-dual-dir-loop.md`](superpowers/specs/archive/2026-04-28-workspace-outputs-dual-dir-loop.md)(排查附录节)
 * Config: [`config.yaml`](../config.yaml) `models[name=minimax-m2.7].max_tokens`

@@ -1,3 +1,14 @@
+> 📦 **归档于 2026-04-29 — 已 ship**
+>
+> **当前事实**：
+> - 后端 `GET /api/tool-groups` 已实装（[agents.py](../../../../backend/app/gateway/routers/agents.py) line 123）。
+> - 前端 edit page 已上线（[frontend/src/app/workspace/agents/[agent_name]/edit/page.tsx](../../../../frontend/src/app/workspace/agents/%5Bagent_name%5D/edit/page.tsx)）。
+> - i18n keys（`agents.edit*`）、tri-state helper、`useToolGroups` hook 全部交付。
+>
+> 下文为施工时的原始 plan，仅作历史档案保留。
+
+---
+
 # Custom Agent Edit Page Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

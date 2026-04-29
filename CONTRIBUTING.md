@@ -190,11 +190,11 @@ If you need to start services individually:
    cd backend
    make dev
 
-   # Terminal 2: Start Gateway API (port 8001)
+   # Terminal 2: Start Gateway API (port 8100)
    cd backend
    make gateway
 
-   # Terminal 3: Start Frontend (port 3000)
+   # Terminal 3: Start Frontend (port 3110)
    cd frontend
    pnpm dev
    ```
@@ -235,7 +235,7 @@ deer-flow/
 │       └── nginx.local.conf # Nginx config for local dev
 ├── backend/                 # Backend application
 │   ├── src/
-│   │   ├── gateway/        # Gateway API (port 8001)
+│   │   ├── gateway/        # Gateway API (8100 local / 8001 in Docker)
 │   │   ├── agents/         # LangGraph agents (port 2024)
 │   │   ├── mcp/            # Model Context Protocol integration
 │   │   ├── skills/         # Skills system
@@ -255,8 +255,8 @@ deer-flow/
 Browser
   ↓
 Nginx (port 2026) ← Unified entry point
-  ├→ Frontend (port 3000) ← / (non-API requests)
-  ├→ Gateway API (port 8001) ← /api/models, /api/mcp, /api/skills, /api/threads/*/artifacts
+  ├→ Frontend (3110 local / 3000 in Docker) ← / (non-API requests)
+  ├→ Gateway API (8100 local / 8001 in Docker) ← /api/models, /api/mcp, /api/skills, /api/threads/*/artifacts
   └→ LangGraph Server (port 2024) ← /api/langgraph/* (agent interactions)
 ```
 

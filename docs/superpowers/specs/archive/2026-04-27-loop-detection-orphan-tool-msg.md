@@ -1,7 +1,13 @@
+> 📦 **归档于 2026-04-29 — hard_stop 已 ship；warning 路径仍 open**
+>
+> hard_stop 路径修复已落地（[loop_detection_middleware.py](../../../../backend/packages/harness/deerflow/agents/middlewares/loop_detection_middleware.py) line 508-516 `RemoveMessage`）。warning 路径（line 373-380）注入 HumanMessage 仍未修，已实证导致 thread 永久损坏 — 详见 [OPEN_ISSUES.md OI-1](../../../OPEN_ISSUES.md) + [docs/lessons.md](../../../lessons.md) 2026-04-28 完整复盘。
+
+---
+
 # LoopDetectionMiddleware 清空 tool_calls 留下孤儿 ToolMessage 的修复
 
 **记录日期：** 2026-04-27
-**状态：** open · 长期 parking lot（self-hosting epic 之后再修；优先级低于自托管）
+**状态：** hard_stop ✅ shipped；warning 🟡 open（详见上方 banner）
 **严重程度：** P1 — 用户分析任务被卡住无法继续
 **与 langgraph-compat 关系：** 无关（standard mode 同样存在），只是切换后用户活跃度高暴露出来
 **待办：** 实施计划尚未撰写；推荐 A 方案（用 `RemoveMessage` 清孤儿）。详见下文。

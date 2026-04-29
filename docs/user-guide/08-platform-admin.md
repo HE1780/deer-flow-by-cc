@@ -24,7 +24,7 @@
 - **改名** — 只改 display name，不改 slug
 - **软删除** — 标记 deactivated，租户内数据保留但不可登录。**没有硬删按钮** —— 真要清数据需要后端运维操作
 
-> ⚠️ **租户详情页**（`/admin/tenants/{id}`）当前是占位页。详细统计与 owner 转移等高级操作需要通过后端 API 或后续版本。
+**租户详情页**（`/admin/tenants/{id}`）已上线，支持租户重命名、查看统计（工作区数、成员数）和软删除。Owner 转移等更高级操作仍需通过后端 API。
 
 ## 技能审核（`/admin/skills`）
 
@@ -53,10 +53,7 @@
 
 ## 已知限制
 
-详见 [09 已知限制](09-faq-and-known-issues.md)：
-
-- 租户详情页 stub
-- M6 audit fallback.jsonl 路径异常时 gateway 启动可能失败（运维相关）
+详见 [09 已知限制](09-faq-and-known-issues.md)。
 
 ## 下一步
 

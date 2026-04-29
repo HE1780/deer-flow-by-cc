@@ -1,8 +1,12 @@
+> 📦 **归档于 2026-04-29 — 已 ship**：5 处 call site 全部修复（commits `aedcf8af`/`4ce6c997`/`9722937c`/`16770364`/`4eca6cc5`），legacy 路径方法加 `DeprecationWarning` 防回归。已知遗漏 (admin UI / OIDC 真机 / 邀请注册前端) 移交 [OPEN_ISSUES.md](../../../OPEN_ISSUES.md)。
+
+---
+
 # Uploads Tenant-Aware Path Fix — Design
 
 **Date**: 2026-04-28
 **Author**: Claude (with @lydoc)
-**Status**: Approved → ready to plan
+**Status**: ✅ Shipped（详见上方 banner）
 **Related**:
 - Symptom chat: `localhost:2026/workspace/chats/53617e94-7d39-4174-96ba-de29a579da27`
 - Parent epic: M4 storage isolation (commits `bcc9ccee`, `bc21a46e`, `8828c392`, `9400cc21`, `daefabd9`)

@@ -1,3 +1,7 @@
+> 📦 **归档于 2026-04-29 — 已 ship**：3 个根因（onLangChainEvent 死代码、`str_replace` URL 伪 scheme、MiniMax max_tokens 不足）全部修复（commits `b62d35bc` + `d67e0e13` + 用户改 `config.yaml`）。教训"假死循环先排查 max_tokens"已写入 [docs/lessons.md](../../../lessons.md)。
+
+---
+
 # workspace/outputs 双目录设计触发 agent 死循环
 
 - **状态**:✅ 全部闭环(2026-04-28 晚,用户 smoke 通过)

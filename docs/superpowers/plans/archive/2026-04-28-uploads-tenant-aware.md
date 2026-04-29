@@ -1,3 +1,17 @@
+> 📦 **归档于 2026-04-29 — 已 ship**
+>
+> **当前事实**：5 处 call site 全部修复，对应 commits：
+> - `aedcf8af` UploadsMiddleware 走 tenant-aware 路径（call A）
+> - `4ce6c997` channels/manager 用 tenant-aware outputs_dir（call B）
+> - `9722937c` channels/feishu 透传 tenant_id/workspace_id（call C/D）
+> - `16770364` threads-router DELETE 转发 tenant ids（call E）
+> - `4eca6cc5` UploadsMiddleware 单测覆盖
+> - `113c88c0` legacy 方法加 DeprecationWarning 防回归
+>
+> 下文为原始 plan，仅作历史档案保留。
+
+---
+
 # Uploads Tenant-Aware Path Fix — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

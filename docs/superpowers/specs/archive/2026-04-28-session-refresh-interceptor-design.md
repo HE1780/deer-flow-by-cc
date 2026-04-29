@@ -1,7 +1,11 @@
+> 📦 **归档于 2026-04-29 — 已 ship**：interceptor 已合入 `cc-main`（merge `d6497326`），9 个 vitest 全绿。LangGraph SDK 路径未拦的已知容忍点见 [OPEN_ISSUES.md](../../../OPEN_ISSUES.md)。
+
+---
+
 # Session Refresh Interceptor — Design
 
 **Date:** 2026-04-28
-**Status:** Approved (brainstorming complete, awaiting plan)
+**Status:** ✅ Shipped（详见上方 banner）
 **Owner:** frontend
 **Touches:** `frontend/src/core/identity/fetcher.ts`, `frontend/tests/unit/core/identity/fetcher.test.ts` (new)
 

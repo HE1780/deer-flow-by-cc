@@ -1,8 +1,14 @@
+> 📦 **归档于 2026-04-29 — 正文完成；截图全缺；09 章部分内容已过时**
+>
+> 详见 [OPEN_ISSUES.md OI-6](../../../OPEN_ISSUES.md)。
+
+---
+
 # DeerFlow 用户使用手册 — 设计稿
 
 - **Date**: 2026-04-27
-- **Status**: **open · 内容完成 · 仅缺截图**（2026-04-28 复核：9 章正文 + README 全部写到实质内容，共 ~599 行，但 `docs/user-guide/images/` 目录全是占位符，无实际 PNG）
-- **Companion plan**: [../plans/2026-04-27-user-guide-implementation.md](../plans/2026-04-27-user-guide-implementation.md)
+- **Status**: 🟡 正文完成 / 截图待补 / 09 章待修订（详见上方 banner）
+- **Companion plan**: [../../plans/archive/2026-04-27-user-guide-implementation.md](../../plans/archive/2026-04-27-user-guide-implementation.md)
 - **剩余工作**: ① 补 10+ 张截图（每章 1-2 张），可逐章增量提交；② 任何 UI 改动后回滚的章节复核（07/08 章已实操验证，01-06 写于 frontend/admin nav 改造前，需要确认仍然准确）
 - **Author**: Brainstorm via Claude Code
 - **Audience for this doc**: 自己（spec 评审） + 后续 implementation plan 作者

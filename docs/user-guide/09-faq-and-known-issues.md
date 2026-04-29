@@ -61,15 +61,7 @@ DeerFlow 当前**没有自助密码重置入口**。请联系平台管理员通�
 
 代码里有 `/* TODO: Add more connectors here */` 注释。当前用户看不到任何 connector 入口，也没有副作用 —— 只是一个未完成的扩展点。
 
-### 3. 部分 admin 详情页是占位页（stub）
-
-- `/admin/tenants/{id}` —— 租户详情、统计、owner 转移等需通过 API
-- `/admin/users/{id}` —— 用户详情/角色调整需通过 API
-- `/admin/workspaces/{id}/members` —— 完整度待验证
-
-变通：能通过列表页 + API 直接调用做的事，先用 API。
-
-### 4. OIDC 未在真实 IdP 上端到端验证
+### 3. OIDC 未在真实 IdP 上端到端验证
 
 代码层支持 OIDC 流程，但当前基线版本没有针对 Keycloak / Okta / Azure AD 等具体 IdP 做过完整冒烟。如你是首次接 IdP，建议：
 
@@ -77,11 +69,11 @@ DeerFlow 当前**没有自助密码重置入口**。请联系平台管理员通�
 - 把 IdP 配置失败当作配置问题（多半是 redirect_uri、client_id、scope、JWT issuer 校验之一）
 - 后端 gateway 日志 `logs/gateway.log` 看 OIDC 错误明细
 
-### 5. LoopDetectionMiddleware 可能留下孤儿 ToolMessage
+### 4. LoopDetectionMiddleware warning 路径可能损坏 thread
 
-当 agent 中途调用多次工具触发 loop detection 被强制停止后，后续对话可能被卡住。表现：API 返回 400 错误 `tool result's tool id not found`。这是已知 P1 bug，修复进行中。变通：在此 thread 下开一个新的后续对话。
+当 agent 反复调用同一工具达到 warning 阈值（小于 hard_limit）时，中间件会在工具调用链中间注入提醒消息，破坏严格 provider（MiniMax / Anthropic）的消息配对要求，下一轮 LLM 调用可能被拒。表现：API 返回 400 错误。Hard-stop 路径已修复（自动清孤儿 ToolMessage）；warning 路径仍是已知 P1 bug。变通：在此 thread 下开一个新的后续对话。
 
-### 6. 没有自助密码重置
+### 5. 没有自助密码重置
 
 如 Q1 所述。
 
@@ -89,4 +81,4 @@ DeerFlow 当前**没有自助密码重置入口**。请联系平台管理员通�
 
 - 提 issue：仓库 issue 区
 - 直接修：欢迎 PR
-- 想了解某个功能为什么这么设计：[原始 spec](../superpowers/specs/2026-04-27-user-guide-design.md)
+- 想了解某个功能为什么这么设计：[原始 spec](../superpowers/specs/archive/2026-04-27-user-guide-design.md)

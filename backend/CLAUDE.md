@@ -17,7 +17,7 @@ DeerFlow is a LangGraph-based AI super agent system with a full-stack architectu
 - **Standard mode** (`make dev`): LangGraph Server handles agent execution as a separate process. 4 processes total.
 - **Gateway mode** (`make dev-pro`, experimental): Agent runtime embedded in Gateway via `RunManager` + `run_agent()` + `StreamBridge` (`packages/harness/deerflow/runtime/`). Service manages its own concurrency via async tasks. 3 processes total, no LangGraph Server.
 
-**Known limitation — Standard mode + LLM event loop:** Under `make dev`, the memory updater and subagent executor still hand LLM calls to a fresh ephemeral `asyncio.run(...)` loop. This can trip [langchain-ai/langchain#35783](https://github.com/langchain-ai/langchain/issues/35783) — the `langchain_openai` cached httpx client outlives its first loop and crashes with `RuntimeError: Event loop is closed` on the next call. Gateway mode avoids this by registering the long-lived Uvicorn loop via `deerflow.runtime.main_loop.set_main_loop` during lifespan startup; both call sites then funnel work through `submit_to_main_loop` (see `docs/superpowers/specs/2026-04-28-llm-event-loop-closed-design.md`). Production deployments should prefer Gateway mode.
+**Known limitation — Standard mode + LLM event loop:** Under `make dev`, the memory updater and subagent executor still hand LLM calls to a fresh ephemeral `asyncio.run(...)` loop. This can trip [langchain-ai/langchain#35783](https://github.com/langchain-ai/langchain/issues/35783) — the `langchain_openai` cached httpx client outlives its first loop and crashes with `RuntimeError: Event loop is closed` on the next call. Gateway mode avoids this by registering the long-lived Uvicorn loop via `deerflow.runtime.main_loop.set_main_loop` during lifespan startup; both call sites then funnel work through `submit_to_main_loop` (see `docs/superpowers/specs/archive/2026-04-28-llm-event-loop-closed-design.md`). Production deployments should prefer Gateway mode.
 
 **Project Structure**:
 ```
@@ -34,7 +34,7 @@ deer-flow/
 │   │       └── deerflow/
 │   │           ├── agents/            # LangGraph agent system
 │   │           │   ├── lead_agent/    # Main agent (factory + system prompt)
-│   │           │   ├── middlewares/   # 10 middleware components
+│   │           │   ├── middlewares/   # 18 middleware components
 │   │           │   ├── memory/        # Memory extraction, queue, prompts
 │   │           │   └── thread_state.py # ThreadState schema
 │   │           ├── sandbox/           # Sandbox execution system
@@ -168,18 +168,18 @@ Lead-agent middlewares are assembled in strict append order across `packages/har
 5. **LLMErrorHandlingMiddleware** - Normalizes provider/model invocation failures into recoverable assistant-facing errors before later middleware/tool stages run
 6. **IdentityGuardrailMiddleware** *(M5, only when `DEERFLOW_INTERNAL_SIGNING_KEY` is set)* — Identity-driven tool authorization. Reads `state["identity"].permissions`, matches against the built-in `TOOL_PERMISSION_MAP` (spec §6.4). Unknown tools default-deny (whitelist). MCP tools honor a declared `required_permission` attribute or fall back to `DEFAULT_MCP_PERMISSION = "skill:invoke"`. Runs before the optional OAP `GuardrailMiddleware` so both gates compose.
 7. **GuardrailMiddleware** - Pre-tool-call authorization via pluggable `GuardrailProvider` protocol (optional, if `guardrails.enabled` in config). Evaluates each tool call and returns error ToolMessage on deny. Three provider options: built-in `AllowlistProvider` (zero deps), OAP policy providers (e.g. `aport-agent-guardrails`), or custom providers. See [docs/GUARDRAILS.md](docs/GUARDRAILS.md) for setup, usage, and how to implement a provider.
-7. **SandboxAuditMiddleware** - Audits sandboxed shell/file operations for security logging before tool execution continues
-8. **ToolErrorHandlingMiddleware** - Converts tool exceptions into error `ToolMessage`s so the run can continue instead of aborting
-9. **SummarizationMiddleware** - Context reduction when approaching token limits (optional, if enabled)
-10. **TodoListMiddleware** - Task tracking with `write_todos` tool (optional, if plan_mode)
-11. **TokenUsageMiddleware** - Records token usage metrics when token tracking is enabled (optional)
-12. **TitleMiddleware** - Auto-generates thread title after first complete exchange and normalizes structured message content before prompting the title model
-13. **MemoryMiddleware** - Queues conversations for async memory update (filters to user + final AI responses)
-14. **ViewImageMiddleware** - Injects base64 image data before LLM call (conditional on vision support)
-15. **DeferredToolFilterMiddleware** - Hides deferred tool schemas from the bound model until tool search is enabled (optional)
-16. **SubagentLimitMiddleware** - Truncates excess `task` tool calls from model response to enforce `MAX_CONCURRENT_SUBAGENTS` limit (optional, if `subagent_enabled`)
-17. **LoopDetectionMiddleware** - Detects repeated tool-call loops; hard-stop responses clear both structured `tool_calls` and raw provider tool-call metadata before forcing a final text answer
-18. **ClarificationMiddleware** - Intercepts `ask_clarification` tool calls, interrupts via `Command(goto=END)` (must be last)
+8. **SandboxAuditMiddleware** - Audits sandboxed shell/file operations for security logging before tool execution continues
+9. **ToolErrorHandlingMiddleware** - Converts tool exceptions into error `ToolMessage`s so the run can continue instead of aborting
+10. **SummarizationMiddleware** - Context reduction when approaching token limits (optional, if enabled)
+11. **TodoListMiddleware** - Task tracking with `write_todos` tool (optional, if plan_mode)
+12. **TokenUsageMiddleware** - Records token usage metrics when token tracking is enabled (optional)
+13. **TitleMiddleware** - Auto-generates thread title after first complete exchange and normalizes structured message content before prompting the title model
+14. **MemoryMiddleware** - Queues conversations for async memory update (filters to user + final AI responses)
+15. **ViewImageMiddleware** - Injects base64 image data before LLM call (conditional on vision support)
+16. **DeferredToolFilterMiddleware** - Hides deferred tool schemas from the bound model until tool search is enabled (optional)
+17. **SubagentLimitMiddleware** - Truncates excess `task` tool calls from model response to enforce `MAX_CONCURRENT_SUBAGENTS` limit (optional, if `subagent_enabled`)
+18. **LoopDetectionMiddleware** - Detects repeated tool-call loops; hard-stop responses clear both structured `tool_calls` and raw provider tool-call metadata before forcing a final text answer
+19. **ClarificationMiddleware** - Intercepts `ask_clarification` tool calls, interrupts via `Command(goto=END)` (must be last)
 
 ### Configuration System
 
@@ -398,7 +398,7 @@ Scopes: `"platform"` (permission check only), `"tenant"` (also verifies caller i
 - `app/gateway/identity/storage/cli.py` + `make identity-dirs TENANT_ID=X [WORKSPACE_ID=Y]` — idempotent directory bootstrap that creates the tenant tree with `0700` permissions. Safe to re-run; missing dirs are created, existing dirs are left alone.
 - **Harness tenant-aware paths**: `packages/harness/deerflow/config/paths.py::Paths` gained `resolve_thread_dir`, `resolve_sandbox_{work,uploads,outputs,user_data}_dir`, `resolve_acp_workspace_dir`, `ensure_thread_dirs_for`, and their host-side variants. Legacy methods are untouched so single-tenant callers keep working. `resolve_virtual_path` accepts optional `tenant_id`/`workspace_id` kwargs.
 - **Identity extraction helper**: `packages/harness/deerflow/agents/middlewares/_identity.py::extract_tenant_ids()` is the shared defensive reader for `state["identity"]` — returns `(tenant_id, workspace_id)` only when both are positive ints, otherwise `(None, None)`. Consumed by `ThreadDataMiddleware`, `SandboxMiddleware`, `UploadsMiddleware`, and `present_file_tool`.
-- **Middleware / router consumption**: `ThreadDataMiddleware`, `SandboxMiddleware`, and (since 2026-04-28) `UploadsMiddleware` read `state["identity"]` and route through the tenant-aware path helpers when the pair is valid. Gateway routers `routers/artifacts.py`, `routers/uploads.py`, and `routers/threads.py` (the local-cleanup `DELETE` handler) read identity via the shared `app.gateway.identity.request_scope.extract_scope` helper and enforce `assert_within_tenant_root` (or `delete_thread_dir_for`) on every GET/POST/LIST/DELETE; cross-tenant attempts return a generic `403 "Access denied"` (no leak of tenant IDs or filesystem paths). The IM channel artifact dispatch path (`app/channels/manager.py:_resolve_attachments` + `app/channels/feishu.py:_receive_single_file`) also forwards tenant ids end-to-end. Flag off → legacy flat paths. Legacy path methods (`Paths.thread_dir`, `Paths.sandbox_*_dir`, `Paths.ensure_thread_dirs`, `Paths.delete_thread_dir`) emit `DeprecationWarning` to catch future regressions; use the `resolve_*` / `_for` cousins in new code. See `docs/superpowers/specs/2026-04-28-uploads-tenant-aware-design.md` for the M4 oversight retrofit.
+- **Middleware / router consumption**: `ThreadDataMiddleware`, `SandboxMiddleware`, and (since 2026-04-28) `UploadsMiddleware` read `state["identity"]` and route through the tenant-aware path helpers when the pair is valid. Gateway routers `routers/artifacts.py`, `routers/uploads.py`, and `routers/threads.py` (the local-cleanup `DELETE` handler) read identity via the shared `app.gateway.identity.request_scope.extract_scope` helper and enforce `assert_within_tenant_root` (or `delete_thread_dir_for`) on every GET/POST/LIST/DELETE; cross-tenant attempts return a generic `403 "Access denied"` (no leak of tenant IDs or filesystem paths). The IM channel artifact dispatch path (`app/channels/manager.py:_resolve_attachments` + `app/channels/feishu.py:_receive_single_file`) also forwards tenant ids end-to-end. Flag off → legacy flat paths. Legacy path methods (`Paths.thread_dir`, `Paths.sandbox_*_dir`, `Paths.ensure_thread_dirs`, `Paths.delete_thread_dir`) emit `DeprecationWarning` to catch future regressions; use the `resolve_*` / `_for` cousins in new code. See `docs/superpowers/specs/archive/2026-04-28-uploads-tenant-aware-design.md` for the M4 oversight retrofit.
 - **Channel identity**: `app/channels/manager.py::_resolve_channel_identity` reads `tenant_id`/`workspace_id` from `channel_sessions.<name>` (falling back to `default_session`) when `ENABLE_IDENTITY=true`. `ChannelManager._create_thread` persists the pair into `ChannelStore` at thread creation time; `_handle_chat` + `_handle_streaming_chat` read them back via `get_thread_mapping` and pass them to `paths.resolve_virtual_path` so IM artifacts land under the tenant-stratified outputs directory. Flag off → both values `None` → legacy single-tenant path preserved.
 
 **LangGraph identity propagation (M5):**
@@ -466,7 +466,7 @@ Docs: `docs/UPGRADE_v2.md` (path A greenfield / path B migration), `docs/identit
 
 **Still open for a follow-up session:** None — M7 Part C.8 (GitHub Actions identity E2E smoke) shipped via `.github/workflows/identity-e2e-smoke.yml` (bypasses OIDC by minting an RS256 JWT directly for the bootstrap admin); channel identity TODO resolved via `ChannelStore` persistence of `tenant_id`/`workspace_id` and `Paths.resolve_virtual_path` wiring.
 
-**Roadmap:** M1 – M6 + M7 B (migration) + M7 C (release hardening) shipped. M7 A (admin UI) still open. See `docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md`.
+**Roadmap:** M1 – M7 全部 shipped（含 M7-A admin UI、M7-B migration、M7-C release hardening）。后续 P1+ 路线图入口见 `docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`。开放议题与下一步讨论方向集中在 `docs/OPEN_ISSUES.md`。
 
 ### Model Factory (`packages/harness/deerflow/models/factory.py`)
 
@@ -509,8 +509,8 @@ Bridges external messaging platforms (Feishu, Slack, Telegram) to the DeerFlow a
 
 **Configuration** (`config.yaml` -> `channels`):
 - `langgraph_url` - LangGraph Server URL (default: `http://localhost:2024`)
-- `gateway_url` - Gateway API URL for auxiliary commands (default: `http://localhost:8100`)
-- In Docker Compose, IM channels run inside the `gateway` container, so `localhost` points back to that container. Use `http://langgraph:2024` / `http://gateway:8001`, or set `DEER_FLOW_CHANNELS_LANGGRAPH_URL` / `DEER_FLOW_CHANNELS_GATEWAY_URL`.
+- `gateway_url` - Gateway API URL for auxiliary commands (default: `http://localhost:8100` for local dev)
+- In Docker Compose the gateway container exposes 8001, so IM channels (which run inside that container) should use `http://langgraph:2024` / `http://gateway:8001`. Override with `DEER_FLOW_CHANNELS_LANGGRAPH_URL` / `DEER_FLOW_CHANNELS_GATEWAY_URL` if needed.
 - Per-channel configs: `feishu` (app_id, app_secret), `slack` (bot_token, app_token), `telegram` (bot_token)
 
 ### Memory System (`packages/harness/deerflow/agents/memory/`)

@@ -190,7 +190,7 @@ admin shell under `/admin/*`. Routing rules:
 
 The identity client (`src/core/identity/`) speaks directly to the
 backend routes documented in
-[../docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md](../docs/superpowers/specs/2026-04-21-deerflow-identity-foundation-design.md):
+[../docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md](../docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md):
 
 | Page                      | Backend routes consumed                                                |
 |---------------------------|------------------------------------------------------------------------|
