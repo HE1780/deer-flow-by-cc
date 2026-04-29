@@ -5,6 +5,16 @@ type Listener = () => void;
 const listeners = new Set<Listener>();
 let sessionExpiredPending = false;
 
+/** Internal-only extension of RequestInit. Set to `true` on the refresh
+ *  call itself and on the single post-refresh retry, so a real 401 in
+ *  either of those code paths surfaces directly without recursing. */
+type InternalInit = RequestInit & { _skipRefreshOn401?: boolean };
+
+/** Singleflight slot. While a refresh is in-flight, all concurrent 401
+ *  callers await the same promise. `null` once the refresh resolves so a
+ *  later 401 starts a fresh attempt. */
+let pendingRefresh: Promise<boolean> | null = null;
+
 export function onSessionExpired(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -24,6 +34,25 @@ function emitSessionExpired(): void {
   sessionExpiredPending = true;
   for (const fn of listeners) fn();
 }
+
+/** Singleflight refresh helper. Returns `true` if the access cookie was
+ *  re-issued, `false` otherwise. Internal-only — the only caller is
+ *  identityFetch's 401 branch (and `identityApi.refresh` via re-export). */
+async function refreshSession(): Promise<boolean> {
+  if (pendingRefresh) return pendingRefresh;
+  pendingRefresh = identityFetch<unknown>("/api/auth/refresh", {
+    method: "POST",
+    _skipRefreshOn401: true,
+  } as InternalInit)
+    .then(() => true)
+    .catch(() => false)
+    .finally(() => {
+      pendingRefresh = null;
+    });
+  return pendingRefresh;
+}
+
+export { refreshSession as _refreshSessionForIdentityApi };
 
 /** Error thrown by identityFetch. Carries the IdentityError variant so callers
  *  can switch on `err.kind`. Extends `Error` so lint rules that require thrown
@@ -49,17 +78,30 @@ export async function identityFetch<T>(
   input: string,
   init?: RequestInit,
 ): Promise<T> {
+  const { _skipRefreshOn401, ...realInit } = (init ?? {}) as InternalInit;
+
   const resp = await fetch(input, {
     credentials: "include",
     headers: {
       accept: "application/json",
-      ...(init?.body ? { "content-type": "application/json" } : {}),
-      ...init?.headers,
+      ...(realInit.body ? { "content-type": "application/json" } : {}),
+      ...realInit.headers,
     },
-    ...init,
+    ...realInit,
   });
 
   if (resp.status === 401) {
+    if (_skipRefreshOn401) {
+      emitSessionExpired();
+      throw new IdentityFetchError({ kind: "unauthenticated" });
+    }
+    const refreshed = await refreshSession();
+    if (refreshed) {
+      return identityFetch<T>(input, {
+        ...init,
+        _skipRefreshOn401: true,
+      } as InternalInit);
+    }
     emitSessionExpired();
     throw new IdentityFetchError({ kind: "unauthenticated" });
   }
