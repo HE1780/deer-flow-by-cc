@@ -147,15 +147,7 @@ async def refresh(request: Request, response: Response):
         aud=rt.audience,
     )
     new_token = issue_access_token(claims, private_key_pem=rt.jwt_private_key_pem)
-    response.set_cookie(
-        rt.cookie_name,
-        new_token,
-        httponly=True,
-        secure=rt.cookie_secure,
-        samesite="lax",
-        max_age=rt.access_ttl_sec,
-        path="/",
-    )
+    _set_session_cookie(response, new_token)
     return {"access_token": new_token, "token_type": "Bearer", "expires_in": rt.access_ttl_sec}
 
 
