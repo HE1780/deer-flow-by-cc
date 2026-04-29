@@ -33,16 +33,12 @@ from app.gateway.identity.models import (
 )
 from app.gateway.identity.rbac.decorator import requires
 from app.gateway.identity.settings import get_identity_settings
+from app.gateway.identity.validators import EMAIL_RE
 
 router = APIRouter(tags=["identity-admin-writes"])
 
 
 # --- Schemas ---------------------------------------------------------------
-
-
-# Pragmatic email regex — RFC 5322 is too permissive for our needs and we
-# don't want to drag in `email-validator`. Tightened during onboarding flow.
-_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 
 class CreateUserIn(BaseModel):
@@ -54,7 +50,7 @@ class CreateUserIn(BaseModel):
     @classmethod
     def _email_shape(cls, v: str) -> str:
         v = v.strip()
-        if not _EMAIL_RE.match(v):
+        if not EMAIL_RE.match(v):
             raise ValueError("invalid email format")
         return v
 

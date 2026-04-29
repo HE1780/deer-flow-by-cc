@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 from datetime import UTC, datetime
 
@@ -38,8 +37,7 @@ from app.gateway.identity.models.role import Role
 from app.gateway.identity.models.tenant import Workspace
 from app.gateway.identity.models.user import Membership, User, WorkspaceMember
 from app.gateway.identity.settings import get_identity_settings
-
-_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
+from app.gateway.identity.validators import EMAIL_RE
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +248,7 @@ async def register(
     if len(body.password) < 8:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password must be at least 8 characters")
     email = body.email.strip().lower()
-    if not _EMAIL_RE.match(email):
+    if not EMAIL_RE.match(email):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid email format")
 
     # Find candidate codes by prefix + pending. -----------------------------
