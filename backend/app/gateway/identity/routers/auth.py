@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
+from datetime import UTC, datetime
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.gateway.identity.auth.identity_factory import (
     build_identity_for_user,
@@ -29,7 +32,14 @@ from app.gateway.identity.auth.oidc import (
     StateMismatchError,
 )
 from app.gateway.identity.auth.runtime import get_runtime
-from app.gateway.identity.models.user import User
+from app.gateway.identity.db import get_session
+from app.gateway.identity.models.registration_code import RegistrationCode
+from app.gateway.identity.models.role import Role
+from app.gateway.identity.models.tenant import Workspace
+from app.gateway.identity.models.user import Membership, User, WorkspaceMember
+from app.gateway.identity.settings import get_identity_settings
+
+_EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +227,117 @@ async def password_login(body: PasswordLoginIn, request: Request, response: Resp
 
     _set_session_cookie(response, access_token)
     return {"status": "ok"}
+
+
+class RegisterIn(BaseModel):
+    code: str
+    email: str
+    password: str
+    display_name: str | None = None
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
+async def register(
+    body: RegisterIn,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_session),
+):
+    rt = get_runtime()
+    settings = get_identity_settings()
+
+    # Input validation -----------------------------------------------------
+    if len(body.password) < 8:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "password must be at least 8 characters")
+    email = body.email.strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid email format")
+
+    # Find candidate codes by prefix + pending. -----------------------------
+    prefix = body.code[:8]
+    candidates = (
+        await session.execute(
+            select(RegistrationCode).where(
+                RegistrationCode.code_prefix == prefix,
+                RegistrationCode.status == 0,
+            )
+        )
+    ).scalars().all()
+
+    rc = None
+    for cand in candidates:
+        if bcrypt.checkpw(body.code.encode(), cand.code_hash.encode()):
+            rc = cand
+            break
+    if rc is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "invalid registration code")
+
+    # Status transitions ---------------------------------------------------
+    now = datetime.now(UTC)
+    if rc.expires_at < now:
+        rc.status = 2
+        await session.commit()
+        raise HTTPException(status.HTTP_410_GONE, "code has expired")
+
+    # Email uniqueness (DB unique acts as the concurrency tiebreaker). -----
+    existing = (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered")
+
+    # Default workspace + workspace_member role lookup ---------------------
+    ws = (
+        await session.execute(
+            select(Workspace)
+            .where(Workspace.tenant_id == rc.tenant_id)
+            .order_by(Workspace.id.asc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if ws is None:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "tenant has no default workspace")
+
+    member_role = (
+        await session.execute(
+            select(Role).where(Role.role_key == "workspace_member", Role.scope == "workspace")
+        )
+    ).scalar_one_or_none()
+    if member_role is None:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "workspace_member role not seeded")
+
+    # Create user + membership + workspace member; mark code accepted. -----
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt(rounds=settings.bcrypt_cost)).decode()
+    user = User(
+        email=email,
+        display_name=body.display_name or email.split("@")[0],
+        status=1,
+        password_hash=password_hash,
+    )
+    session.add(user)
+    await session.flush()
+
+    session.add(Membership(user_id=user.id, tenant_id=rc.tenant_id))
+    session.add(WorkspaceMember(user_id=user.id, workspace_id=ws.id, role_id=member_role.id))
+
+    rc.status = 1
+    rc.accepted_by = user.id
+    rc.accepted_at = now
+
+    await session.commit()
+
+    # Build identity → session → cookie. -----------------------------------
+    tenant, workspace = await resolve_active_tenant(session, user, auto_provision=rt.auto_provision)
+    identity = await build_identity_for_user(session, user, tenant, workspace)
+
+    sess = await rt.session_store.create(
+        user_id=identity.user_id,
+        tenant_id=identity.tenant_id,
+        refresh_token=generate_refresh_token(),
+        ip=_client_ip(request),
+        ua=_user_agent(request),
+    )
+    access_token = _issue_access_for(identity, sess.sid)
+    _set_session_cookie(response, access_token)
+    return {"status": "ok", "email": email}
 
 
 class SetPasswordIn(BaseModel):
