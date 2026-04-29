@@ -24,7 +24,7 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def _clamp_days(value: int) -> int:
+def _sanitize_days(value: int) -> int:
     if value < 1 or value > 90:
         return 7
     return value
@@ -122,7 +122,7 @@ def get_identity_settings() -> IdentitySettings:
         bcrypt_cost=_env_int("DEERFLOW_BCRYPT_COST", 12),
         internal_signing_key=os.environ.get("DEERFLOW_INTERNAL_SIGNING_KEY") or None,
         hmac_skew_sec=_env_int("DEERFLOW_HMAC_SKEW_SEC", 300),
-        registration_code_expires_days=_clamp_days(
+        registration_code_expires_days=_sanitize_days(
             _env_int("REGISTRATION_CODE_EXPIRES_DAYS", 7)
         ),
     )
