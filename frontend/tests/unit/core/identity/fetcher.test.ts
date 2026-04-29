@@ -16,7 +16,12 @@ function makeSequencedFetchMock(
 ): ReturnType<typeof vi.fn> {
   const cursors: Record<string, number> = {};
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === "string" ? input : input.toString();
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
     const method = (init?.method ?? "GET").toUpperCase();
     const key = `${method} ${url}`;
     const queue = routes[key];
