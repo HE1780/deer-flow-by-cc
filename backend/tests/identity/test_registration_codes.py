@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -105,3 +106,50 @@ def test_create_code_forbidden_for_member(codes_app):
     with TestClient(app) as c:
         r = c.post("/api/tenants/1/registration-codes", json={})
     assert r.status_code == 403
+
+
+def test_list_codes_excludes_plaintext(codes_app):
+    app, holder = codes_app
+    holder["identity"] = _identity_for_role("tenant_owner", tenant_id=1)
+
+    fake = SimpleNamespace(
+        id=1,
+        tenant_id=1,
+        code_prefix="abc12345",
+        status=0,
+        expires_at=datetime(2026, 5, 6, tzinfo=UTC),
+        accepted_by=None,
+        accepted_at=None,
+        created_at=datetime(2026, 4, 29, tzinfo=UTC),
+    )
+
+    class _S(_StubSession):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        async def execute(self, stmt):
+            self.calls += 1
+            r = MagicMock()
+            if self.calls == 1:
+                r.scalar.return_value = 1  # count(*)
+            else:
+                r.scalars.return_value.all.return_value = [fake]
+            return r
+
+    holder["session"] = _S()
+    with TestClient(app) as c:
+        r = c.get("/api/tenants/1/registration-codes")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["total"] == 1
+    assert body["items"][0]["code_prefix"] == "abc12345"
+    assert "code" not in body["items"][0]
+    assert "code_hash" not in body["items"][0]
+
+
+def test_list_codes_anonymous_401(codes_app):
+    app, _ = codes_app
+    with TestClient(app) as c:
+        r = c.get("/api/tenants/1/registration-codes")
+    assert r.status_code == 401

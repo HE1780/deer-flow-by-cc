@@ -15,6 +15,7 @@ from typing import Any
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, field_validator
+from sqlalchemy import func as sql_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -669,4 +670,52 @@ async def create_registration_code(
         code_prefix=plaintext[:8],
         expires_at=expires_at,
         created_at=rc.created_at,
+    )
+
+
+@router.get(
+    "/api/tenants/{tid}/registration-codes",
+    dependencies=[Depends(requires("membership:read", "tenant"))],
+    response_model=RegistrationCodeListOut,
+)
+async def list_registration_codes(
+    tid: int,
+    limit: int = 50,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> RegistrationCodeListOut:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+
+    total = (
+        await session.execute(
+            select(sql_func.count(RegistrationCode.id)).where(RegistrationCode.tenant_id == tid)
+        )
+    ).scalar() or 0
+
+    rows = (
+        await session.execute(
+            select(RegistrationCode)
+            .where(RegistrationCode.tenant_id == tid)
+            .order_by(RegistrationCode.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+
+    return RegistrationCodeListOut(
+        items=[
+            RegistrationCodeOut(
+                id=r.id,
+                tenant_id=r.tenant_id,
+                code_prefix=r.code_prefix,
+                status=r.status,
+                expires_at=r.expires_at,
+                accepted_by=r.accepted_by,
+                accepted_at=r.accepted_at,
+                created_at=r.created_at,
+            )
+            for r in rows
+        ],
+        total=int(total),
     )
