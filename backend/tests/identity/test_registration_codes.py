@@ -188,6 +188,7 @@ def test_revoke_missing_code_404(codes_app):
     with TestClient(app) as c:
         r = c.delete("/api/tenants/1/registration-codes/999")
     assert r.status_code == 404
+    assert "registration code" in r.json().get("detail", "").lower()
 
 
 def test_revoke_already_accepted_code_409(codes_app):
