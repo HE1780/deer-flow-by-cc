@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func as sql_func
 from sqlalchemy import select
@@ -680,13 +680,10 @@ async def create_registration_code(
 )
 async def list_registration_codes(
     tid: int,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> RegistrationCodeListOut:
-    limit = max(1, min(limit, 200))
-    offset = max(0, offset)
-
     total = (
         await session.execute(
             select(sql_func.count(RegistrationCode.id)).where(RegistrationCode.tenant_id == tid)
