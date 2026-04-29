@@ -301,3 +301,64 @@ def test_register_email_already_registered_409(reg_app):
     assert r.status_code == 409
     # Code remains pending (we abort before marking accepted).
     assert code_row.status == 0
+
+
+def test_register_concurrent_email_race_returns_409(reg_app):
+    """Pre-check passes but commit hits User.email UNIQUE constraint
+    (concurrent identical email). Handler catches IntegrityError → 409."""
+    from sqlalchemy.exc import IntegrityError
+
+    app, holder = reg_app
+    plaintext = "p" * 40
+    code_row = _make_pending_code(plaintext)
+    workspace_row = SimpleNamespace(id=1, tenant_id=1)
+    role_row = SimpleNamespace(id=4, role_key="workspace_member", scope="workspace")
+
+    class _Sess:
+        def __init__(self):
+            self.added = []
+            self.calls = 0
+
+        def add(self, obj):
+            self.added.append(obj)
+            from app.gateway.identity.models import User
+            if isinstance(obj, User):
+                obj.id = 100
+
+        async def commit(self):
+            # Simulate winner-loser race: pre-check passed (email lookup #2
+            # returned None), but commit hits the UNIQUE constraint.
+            raise IntegrityError("INSERT", {}, Exception("unique violation"))
+
+        async def rollback(self):
+            pass
+
+        async def flush(self):
+            pass
+
+        async def execute(self, stmt):
+            self.calls += 1
+            r = MagicMock()
+            if self.calls == 1:
+                r.scalars.return_value.all.return_value = [code_row]
+            elif self.calls == 2:
+                r.scalar_one_or_none.return_value = None
+            elif self.calls == 3:
+                r.scalar_one_or_none.return_value = workspace_row
+            elif self.calls == 4:
+                r.scalar_one_or_none.return_value = role_row
+            return r
+
+    holder["session"] = _Sess()
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
+        with TestClient(app) as c:
+            r = c.post(
+                "/api/auth/register",
+                json={
+                    "code": plaintext,
+                    "email": "race@example.com",
+                    "password": "longpassword",
+                },
+            )
+    assert r.status_code == 409
+    assert "email already registered" in r.json()["detail"].lower()

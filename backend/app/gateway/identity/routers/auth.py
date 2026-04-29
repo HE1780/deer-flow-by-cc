@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.gateway.identity.auth.identity_factory import (
@@ -320,7 +321,11 @@ async def register(
     rc.accepted_by = user.id
     rc.accepted_at = now
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "email already registered") from None
 
     # Build identity → session → cookie. -----------------------------------
     tenant, workspace = await resolve_active_tenant(session, user, auto_provision=rt.auto_provision)
