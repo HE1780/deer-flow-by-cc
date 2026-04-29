@@ -189,10 +189,12 @@ def test_register_unknown_code_404(reg_app):
 
 
 def test_register_already_used_code_404(reg_app):
-    """A code with status=1 isn't returned by the prefix+pending query → 404
-    (not 410). The spec lists 410 for 'already used', but the query path filters
-    out non-pending, so the bcrypt step never matches. 404 is the correct
-    observable result; behavior is documented in CLAUDE.md."""
+    """A code with status=1 (accepted) or status=3 (revoked) isn't returned by
+    the prefix+pending query → 404 (not 410). The spec lists 410 for 'already
+    used' / 'revoked', but the query path filters out non-pending, so the bcrypt
+    step never matches. 404 is the correct observable result for both states;
+    behavior is documented in CLAUDE.md. This single test covers spec §9.2's
+    'revoked code' case as well — the code path is identical."""
     app, holder = reg_app
     plaintext = "y" * 40
 
