@@ -109,15 +109,7 @@ async def oidc_callback(provider: str, code: str, state: str, request: Request):
 
     # Redirect to next_url if we stashed one; else root.
     response = RedirectResponse("/", status_code=302)
-    response.set_cookie(
-        rt.cookie_name,
-        access_token,
-        httponly=True,
-        secure=rt.cookie_secure,
-        samesite="lax",
-        max_age=rt.access_ttl_sec,
-        path="/",
-    )
+    _set_session_cookie(response, access_token)
     return response
 
 
@@ -231,15 +223,7 @@ async def password_login(body: PasswordLoginIn, request: Request, response: Resp
     if ip:
         await rt.lockout.clear(ip=ip, email=email)
 
-    response.set_cookie(
-        rt.cookie_name,
-        access_token,
-        httponly=True,
-        secure=rt.cookie_secure,
-        samesite="lax",
-        max_age=rt.access_ttl_sec,
-        path="/",
-    )
+    _set_session_cookie(response, access_token)
     return {"status": "ok"}
 
 
@@ -320,6 +304,20 @@ def _issue_access_for(identity, sid: str) -> str:
         aud=rt.audience,
     )
     return issue_access_token(claims, private_key_pem=rt.jwt_private_key_pem)
+
+
+def _set_session_cookie(response: Response, access_token: str) -> None:
+    """Stamp the access token onto the response as the session cookie."""
+    rt = get_runtime()
+    response.set_cookie(
+        rt.cookie_name,
+        access_token,
+        httponly=True,
+        secure=rt.cookie_secure,
+        samesite="lax",
+        max_age=rt.access_ttl_sec,
+        path="/",
+    )
 
 
 def _read_current_access_token(request: Request, cookie_name: str) -> str | None:
