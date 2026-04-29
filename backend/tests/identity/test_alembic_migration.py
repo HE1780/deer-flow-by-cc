@@ -44,6 +44,7 @@ async def test_upgrade_then_downgrade(pg_url, monkeypatch):
         "workspace_members",
         "api_tokens",
         "audit_logs",
+        "registration_codes",
     }
     assert expected.issubset(table_names)
 
