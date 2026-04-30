@@ -42,4 +42,4 @@
 | [uploads-tenant-aware-design](./archive/2026-04-28-uploads-tenant-aware-design.md) | ✅ 已 ship |
 | [workspace-outputs-dual-dir-loop](./archive/2026-04-28-workspace-outputs-dual-dir-loop.md) | ✅ 已 ship |
 | [session-refresh-interceptor-design](./archive/2026-04-28-session-refresh-interceptor-design.md) | ✅ 已 ship |
-| [invitation-registration-design](./archive/2026-04-28-invitation-registration-design.md) | 🟡 实施未启动 → [OPEN_ISSUES OI-4](../../OPEN_ISSUES.md) |
+| [registration-code-design](./archive/2026-04-29-registration-code-design.md) | ✅ 已 ship — merged e7235070 |

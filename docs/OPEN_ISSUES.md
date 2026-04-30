@@ -75,23 +75,23 @@
 
 ## P2 — 体验 / 完整度（不阻塞）
 
-### OI-4 邀请制注册（invitation registration）实施未启动
+### OI-4 注册码注册（registration-code）— ✅ 后端已 ship（2026-04-30）
 
 **当前事实**：
-- 设计完整：[docs/superpowers/specs/archive/2026-04-28-invitation-registration-design.md](superpowers/specs/archive/2026-04-28-invitation-registration-design.md)
-- Plan 完整：[docs/superpowers/plans/archive/2026-04-28-invitation-registration.md](superpowers/plans/archive/2026-04-28-invitation-registration.md)
-- **代码未动**：
-  - `backend/app/gateway/identity/models/invitation.py` MISSING
-  - 无 Alembic 迁移 `0006_invitations`
-  - `routers/auth.py` 无 `/register` 端点
-  - `routers/admin_writes.py` 无 `/api/tenants/{tid}/invitations` 三端点
+- 设计：[docs/superpowers/specs/2026-04-29-registration-code-design.md](superpowers/specs/2026-04-29-registration-code-design.md)
+- Plan：[docs/superpowers/plans/2026-04-29-registration-code.md](superpowers/plans/2026-04-29-registration-code.md)
+- 实施：merged into cc-main as `e7235070`（23 commits，173 测试绿）
+- 行为契约见 [backend/CLAUDE.md](../backend/CLAUDE.md) "Registration code flow" 小节
 
-**范围**：1 张表 + 3 个 admin 端点 + 1 个 public `/api/auth/register`。Frontend UI 不在范围。
+**仍待办**（不阻塞 P0/P1）：
+- 前端注册页面（输入码 + email + password 表单）
+- email 通知（注册码链接当前由 admin OOB 分发）
+- skill publish 审核机制（启用后再放开 `skill:publish` 给 `workspace_member`）
+- existing user 升级 `workspace_member`（本期只对未来扫码注册的人生效）
 
-**待讨论**：
-1. 是否纳入下一期？依赖项已就绪（M2 password_login + bcrypt + session）。
-2. 邀请 token 是否走邮件（需要 SMTP 集成）还是仅返回链接由 admin 手动 OOB 分发？设计目前是后者。
-3. 是否需要邀请数量限制 / 速率控制？设计未涉及。
+**已知 tech debt**（review 阶段记录）：
+- `set_password` 和 `create_user` 仍用默认 bcrypt cost（应读 `settings.bcrypt_cost`）
+- `_EMAIL_RE` 已抽到 `validators.EMAIL_RE` 共享模块；其它 router 如有重复 regex 可复用
 
 ---
 

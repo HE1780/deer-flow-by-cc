@@ -49,7 +49,7 @@
 | [session-refresh-interceptor](./archive/2026-04-28-session-refresh-interceptor.md) | ✅ 已 ship — 9 vitest 全绿 |
 | [uploads-tenant-aware](./archive/2026-04-28-uploads-tenant-aware.md) | ✅ 已 ship — 5 处 call site 全部修复 |
 | [user-guide-implementation](./archive/2026-04-27-user-guide-implementation.md) | 🟡 正文完成 / 截图待补 → [OPEN_ISSUES OI-6](../../OPEN_ISSUES.md) |
-| [invitation-registration](./archive/2026-04-28-invitation-registration.md) | 🟡 实施未启动（设计完整）→ [OPEN_ISSUES OI-4](../../OPEN_ISSUES.md) |
+| [registration-code](./archive/2026-04-29-registration-code.md) | ✅ 已 ship — admin 三件套 + 公开 /register + workspace_member role；merged e7235070 |
 
 ---
 
