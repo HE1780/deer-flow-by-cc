@@ -189,4 +189,22 @@ describe("RegisterPage", () => {
       await screen.findByText(/account with this email already exists/i),
     ).toBeTruthy();
   });
+
+  it("toggles password visibility when Show/Hide button is clicked", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams("code=invitex123");
+    meMock.mockRejectedValue(new Error("401"));
+
+    renderWithClient();
+
+    const password = await screen.findByLabelText(/^password$/i);
+    expect(password.getAttribute("type")).toBe("password");
+
+    await user.click(screen.getByRole("button", { name: /show password/i }));
+    expect(password.getAttribute("type")).toBe("text");
+
+    await user.click(screen.getByRole("button", { name: /hide password/i }));
+    expect(password.getAttribute("type")).toBe("password");
+  });
 });
