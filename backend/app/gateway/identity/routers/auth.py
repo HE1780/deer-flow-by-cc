@@ -7,7 +7,6 @@ import os
 import time
 from datetime import UTC, datetime
 
-import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -31,13 +30,13 @@ from app.gateway.identity.auth.oidc import (
     StateExpiredError,
     StateMismatchError,
 )
+from app.gateway.identity.auth.passwords import hash_password, verify_password
 from app.gateway.identity.auth.runtime import get_runtime
 from app.gateway.identity.db import get_session
 from app.gateway.identity.models.registration_code import RegistrationCode
 from app.gateway.identity.models.role import Role
 from app.gateway.identity.models.tenant import Workspace
 from app.gateway.identity.models.user import Membership, User, WorkspaceMember
-from app.gateway.identity.settings import get_identity_settings
 from app.gateway.identity.validators import EMAIL_RE
 
 logger = logging.getLogger(__name__)
@@ -196,7 +195,7 @@ async def password_login(body: PasswordLoginIn, request: Request, response: Resp
 
     invalid = user is None or not user.password_hash or user.status != 1
     if not invalid:
-        invalid = not bcrypt.checkpw(body.password.encode(), user.password_hash.encode())
+        invalid = not verify_password(body.password, user.password_hash)
 
     if invalid:
         if ip:
@@ -243,7 +242,6 @@ async def register(
     session: AsyncSession = Depends(get_session),
 ):
     rt = get_runtime()
-    settings = get_identity_settings()
 
     # Input validation -----------------------------------------------------
     if len(body.password) < 8:
@@ -265,7 +263,7 @@ async def register(
 
     rc = None
     for cand in candidates:
-        if bcrypt.checkpw(body.code.encode(), cand.code_hash.encode()):
+        if verify_password(body.code, cand.code_hash):
             rc = cand
             break
     if rc is None:
@@ -304,7 +302,7 @@ async def register(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "workspace_member role not seeded")
 
     # Create user + membership + workspace member; mark code accepted. -----
-    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt(rounds=settings.bcrypt_cost)).decode()
+    password_hash = hash_password(body.password)
     user = User(
         email=email,
         display_name=body.display_name or email.split("@")[0],
@@ -369,7 +367,7 @@ async def set_password(body: SetPasswordIn, request: Request):
         if "platform_admin" not in identity.roles.get("platform", []):
             raise HTTPException(status.HTTP_403_FORBIDDEN, "platform_admin required")
 
-    hashed = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    hashed = hash_password(body.password)
 
     rt = get_runtime()
     async with rt.session_maker() as db:

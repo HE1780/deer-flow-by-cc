@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -16,6 +15,7 @@ from app.gateway.identity.auth.api_token import (
 from app.gateway.identity.auth.dependencies import require_authenticated
 from app.gateway.identity.auth.identity import Identity
 from app.gateway.identity.auth.identity_factory import build_identity_for_user
+from app.gateway.identity.auth.passwords import hash_password, verify_password
 from app.gateway.identity.auth.runtime import get_runtime
 from app.gateway.identity.models.tenant import Tenant, Workspace
 from app.gateway.identity.models.token import ApiToken
@@ -136,10 +136,10 @@ async def change_password(
         user = (await db.execute(select(User).where(User.id == identity.user_id))).scalar_one()
         if not user.password_hash:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "password login not initialized for this user")
-        if not bcrypt.checkpw(body.old_password.encode(), user.password_hash.encode()):
+        if not verify_password(body.old_password, user.password_hash):
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, "old password is incorrect")
 
-        user.password_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
+        user.password_hash = hash_password(body.new_password)
         await db.commit()
     return {"status": "ok"}
 

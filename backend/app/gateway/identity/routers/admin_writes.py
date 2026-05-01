@@ -12,7 +12,6 @@ import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func as sql_func
@@ -20,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.gateway.identity.auth.api_token import create_api_token, revoke_api_token
+from app.gateway.identity.auth.passwords import hash_password
 from app.gateway.identity.db import get_session
 from app.gateway.identity.models import (
     ApiToken,
@@ -175,7 +175,7 @@ async def create_user(
     if existing is None:
         password_hash = None
         if body.initial_password:
-            password_hash = bcrypt.hashpw(body.initial_password.encode(), bcrypt.gensalt()).decode()
+            password_hash = hash_password(body.initial_password)
         user = User(
             email=body.email,
             display_name=body.display_name or body.email.split("@")[0],
@@ -640,10 +640,7 @@ async def create_registration_code(
 ) -> CreateRegistrationCodeOut:
     settings = get_identity_settings()
     plaintext = secrets.token_urlsafe(32)
-    code_hash = bcrypt.hashpw(
-        plaintext.encode(),
-        bcrypt.gensalt(rounds=settings.bcrypt_cost),
-    ).decode()
+    code_hash = hash_password(plaintext)
     expires_at = datetime.now(UTC) + timedelta(days=settings.registration_code_expires_days)
 
     rc = RegistrationCode(

@@ -135,8 +135,7 @@ def test_register_happy_path_creates_user_and_sets_cookie(reg_app):
 
 def test_register_weak_password_422(reg_app):
     app, _ = reg_app
-    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()), \
-         patch.object(auth_module, "get_identity_settings", return_value=MagicMock()):
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
         with TestClient(app) as c:
             r = c.post(
                 "/api/auth/register",
@@ -147,8 +146,7 @@ def test_register_weak_password_422(reg_app):
 
 def test_register_invalid_email_422(reg_app):
     app, _ = reg_app
-    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()), \
-         patch.object(auth_module, "get_identity_settings", return_value=MagicMock()):
+    with patch.object(auth_module, "get_runtime", return_value=_patch_runtime()):
         with TestClient(app) as c:
             r = c.post(
                 "/api/auth/register",
