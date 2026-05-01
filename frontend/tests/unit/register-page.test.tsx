@@ -207,4 +207,15 @@ describe("RegisterPage", () => {
     await user.click(screen.getByRole("button", { name: /hide password/i }));
     expect(password.getAttribute("type")).toBe("password");
   });
+
+  it("renders loading state while /api/me is in flight", async () => {
+    // Never-resolving promise simulates pending /api/me
+    meMock.mockReturnValue(new Promise((_resolve) => { /* intentionally never resolves */ }));
+    renderWithClient();
+
+    expect(await screen.findByText(/^loading…$/i)).toBeTruthy();
+    // No form, no banner — just the loading shell.
+    expect(screen.queryByLabelText(/^email$/i)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });
