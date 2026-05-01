@@ -24,6 +24,43 @@ function NoCodeBlock() {
   );
 }
 
+function AlreadyLoggedInBlock({ me }: { me: MeResponse }) {
+  const [signingOut, setSigningOut] = React.useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await identityApi.logout();
+      // Force a full reload so cookies + react-query state are fully reset.
+      // The user lands back on this same URL (with ?code=...) unauthenticated.
+      window.location.reload();
+    } catch {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-6 p-8">
+      <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+      <p className="text-sm text-muted-foreground">
+        You are signed in as{" "}
+        <span className="font-medium text-foreground">
+          {me.email ?? "(unknown)"}
+        </span>
+        . Sign out first if you want to register a new account.
+      </p>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        disabled={signingOut}
+        className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+      >
+        {signingOut ? "Signing out…" : "Sign out"}
+      </button>
+    </main>
+  );
+}
+
 function LoadingShell() {
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center gap-6 p-8">
@@ -44,7 +81,7 @@ export default function RegisterPage() {
   });
 
   if (meQuery.isLoading) return <LoadingShell />;
-  // Already-logged-in branch is added in Task 4.
+  if (meQuery.data?.user_id) return <AlreadyLoggedInBlock me={meQuery.data} />;
   if (!code) return <NoCodeBlock />;
 
   // Form branch is added in Task 5.

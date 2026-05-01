@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import RegisterPage from "@/app/(public)/register/page";
 
@@ -33,6 +33,10 @@ function renderWithClient() {
 }
 
 describe("RegisterPage", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   beforeEach(() => {
     mockSearchParams = new URLSearchParams();
     pushMock.mockReset();
@@ -50,5 +54,34 @@ describe("RegisterPage", () => {
       screen.getByRole("alert").textContent?.toLowerCase(),
     ).toMatch(/invalid invitation link/);
     expect(screen.queryByLabelText(/email/i)).toBeNull();
+  });
+
+  it("shows already-signed-in block with sign-out button when /api/me returns a user", async () => {
+    meMock.mockResolvedValue({
+      user_id: 42,
+      email: "demo@example.com",
+      display_name: "Demo",
+      avatar_url: null,
+      active_tenant_id: 1,
+      tenants: [{ id: 1, slug: "default", name: "Default" }],
+      workspaces: [],
+      permissions: [],
+      roles: {},
+    });
+
+    renderWithClient();
+
+    // Wait until the sign-out button appears (query settled), then check the
+    // surrounding paragraph text (split across a <span>).
+    const btn = await screen.findByRole("button", { name: /sign out/i });
+    const paragraph = btn.closest("main")?.querySelector("p");
+    expect(paragraph?.textContent?.toLowerCase()).toMatch(
+      /you are signed in as demo@example\.com/,
+    );
+    expect(
+      screen.getByRole("button", { name: /sign out/i }),
+    ).toBeTruthy();
+    // The form must NOT render in this state.
+    expect(screen.queryByLabelText(/^password$/i)).toBeNull();
   });
 });
