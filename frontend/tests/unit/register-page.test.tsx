@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import RegisterPage from "@/app/(public)/register/page";
 
@@ -20,6 +20,14 @@ vi.mock("@/core/identity/api", () => ({
     logout: () => Promise.resolve({ status: "ok" }),
   },
 }));
+
+const fetchMock = vi.fn();
+beforeAll(() => {
+  vi.stubGlobal("fetch", fetchMock);
+});
+afterEach(() => {
+  fetchMock.mockReset();
+});
 
 function renderWithClient() {
   const qc = new QueryClient({
@@ -83,5 +91,36 @@ describe("RegisterPage", () => {
     ).toBeTruthy();
     // The form must NOT render in this state.
     expect(screen.queryByLabelText(/^password$/i)).toBeNull();
+  });
+
+  it("submits form on happy path and navigates to /", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams("code=invitex123");
+    meMock.mockRejectedValue(new Error("401"));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ status: "ok", email: "new@example.com" }),
+    });
+
+    renderWithClient();
+
+    const email = await screen.findByLabelText(/^email$/i);
+    const password = screen.getByLabelText(/^password$/i);
+
+    await user.type(email, "new@example.com");
+    await user.type(password, "longenoughpw");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/register",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: expect.stringContaining("invitex123"),
+      }),
+    );
+    expect(pushMock).toHaveBeenCalledWith("/");
   });
 });
