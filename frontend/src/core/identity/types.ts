@@ -300,3 +300,19 @@ export interface CreateOrgKeyPayload {
   expires_in_days?: number | null;
   allowed_skills?: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Public registration (P1 — see docs/superpowers/specs/archive/2026-04-29-registration-code-design.md)
+// ---------------------------------------------------------------------------
+
+export interface RegisterWithCodePayload {
+  code: string;
+  email: string;
+  password: string;
+  display_name?: string;
+}
+
+export interface RegisterWithCodeResponse {
+  status: "ok";
+  email: string;
+}
