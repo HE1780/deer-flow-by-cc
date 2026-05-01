@@ -19,7 +19,12 @@ export function SessionExpiredModal() {
 
   useEffect(() => {
     return onSessionExpired(() => {
-      if (pathname?.startsWith("/login")) {
+      // Public auth pages (/login, /register) don't need the modal — the user
+      // is already on a page that handles unauthenticated state.
+      if (
+        pathname?.startsWith("/login") ||
+        pathname?.startsWith("/register")
+      ) {
         consumeSessionExpired();
         return;
       }

@@ -29,6 +29,9 @@ export default defineConfig({
     env: {
       SKIP_ENV_VALIDATION: "1",
       PORT: "3110",
+      // E2E: all API calls are intercepted by page.route(); gateway URL is
+      // required by next.config.js rewrites() but never actually contacted.
+      DEER_FLOW_INTERNAL_GATEWAY_BASE_URL: "http://127.0.0.1:8100",
     },
   },
 });
