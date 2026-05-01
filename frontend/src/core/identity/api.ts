@@ -29,6 +29,8 @@ import {
   type PatchWorkspacePayload,
   type PermissionsResponse,
   type ProvidersResponse,
+  type RegisterWithCodePayload,
+  type RegisterWithCodeResponse,
   type RolesResponse,
   type SwitchTenantResponse,
   type TenantDetail,
@@ -227,6 +229,17 @@ export const identityApi = {
     }),
   adminSetPassword: (payload: AdminSetPasswordPayload) =>
     identityFetch<{ status: string }>("/api/auth/set-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  // Public self-service registration via tenant_owner-issued one-time code.
+  // Sets the deerflow_session cookie on success (Set-Cookie from backend).
+  // Note: not used by the /register page form itself (which uses raw fetch
+  // to keep the response shape inspectable for field-vs-banner error
+  // routing); exported for future programmatic callers.
+  registerWithCode: (payload: RegisterWithCodePayload) =>
+    identityFetch<RegisterWithCodeResponse>("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
