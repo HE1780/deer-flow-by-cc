@@ -123,4 +123,70 @@ describe("RegisterPage", () => {
     );
     expect(pushMock).toHaveBeenCalledWith("/");
   });
+
+  it("shows password field error on 422 with 'password' in detail", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams("code=invitex123");
+    meMock.mockRejectedValue(new Error("401"));
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 422,
+      json: () => Promise.resolve({ detail: "password must be at least 8 characters" }),
+    });
+
+    renderWithClient();
+
+    await user.type(await screen.findByLabelText(/^email$/i), "x@y.com");
+    await user.type(screen.getByLabelText(/^password$/i), "short");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(
+      await screen.findByText(/password must be at least 8 characters/i),
+    ).toBeTruthy();
+    // No banner.
+    expect(screen.queryAllByRole("alert").length).toBe(1); // only the field-level alert
+  });
+
+  it("shows banner on 404 (invalid code)", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams("code=invitex123");
+    meMock.mockRejectedValue(new Error("401"));
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ detail: "invalid registration code" }),
+    });
+
+    renderWithClient();
+    await user.type(await screen.findByLabelText(/^email$/i), "x@y.com");
+    await user.type(screen.getByLabelText(/^password$/i), "longenoughpw");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(
+      await screen.findByText(/invitation link is invalid or has been used/i),
+    ).toBeTruthy();
+  });
+
+  it("shows email field error on 409 (email exists)", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams("code=invitex123");
+    meMock.mockRejectedValue(new Error("401"));
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: () => Promise.resolve({ detail: "email already registered" }),
+    });
+
+    renderWithClient();
+    await user.type(await screen.findByLabelText(/^email$/i), "dup@y.com");
+    await user.type(screen.getByLabelText(/^password$/i), "longenoughpw");
+    await user.click(screen.getByRole("button", { name: /create account/i }));
+
+    expect(
+      await screen.findByText(/account with this email already exists/i),
+    ).toBeTruthy();
+  });
 });
