@@ -25,7 +25,7 @@
   `/register?code=xxxxxxxx...`
 - 一个 `identityApi.registerWithCode()` 方法 + `RegisterWithCodePayload`
   类型（同时让 admin/UI 后续场景能复用同一份契约）
-- 错误状态分级展示：字段内联 / 顶部 banner / 顶部 toast
+- 错误状态分级展示：字段内联 / 顶部 banner（5xx 与 404/410 共用 banner，详见 §3）
 - vitest 单元测试（8 个用例）
 - Playwright E2E 一条 happy path
 
@@ -61,7 +61,9 @@
   - 404 invalid code   → 顶部 banner "This invitation link is invalid or has been used"
   - 410 expired        → 顶部 banner "This invitation link has expired. Please request a new one."
   - 409 email 已注册   → 邮箱框下方红字 "An account with this email already exists"
-  - 5xx / 网络错       → toast "Registration failed (NNN)"
+  - 5xx / 网络错       → 顶部 banner "Registration failed (NNN), please try again later"
+                       （注：sonner Toaster 在 root layout 未挂载，(public) 路由组没有 toast 容器；
+                        5xx 跟 404/410 共用同一个 banner 组件，零额外依赖）
 ```
 
 ## 4. 文件清单
@@ -144,8 +146,7 @@ CLAUDE.md）：
 type SubmitOutcome =
   | { ok: true }
   | { ok: false; kind: "field"; field: "email" | "password"; msg: string }
-  | { ok: false; kind: "banner"; msg: string }
-  | { ok: false; kind: "toast"; msg: string };
+  | { ok: false; kind: "banner"; msg: string };
 
 async function submitRegister(payload: RegisterWithCodePayload): Promise<SubmitOutcome> {
   const res = await fetch("/api/auth/register", {
@@ -184,8 +185,8 @@ async function submitRegister(payload: RegisterWithCodePayload): Promise<SubmitO
     return { ok: false, kind: "field", field: "email",
              msg: "An account with this email already exists" };
   }
-  return { ok: false, kind: "toast",
-           msg: `Registration failed (${res.status})` };
+  return { ok: false, kind: "banner",
+           msg: `Registration failed (${res.status}), please try again later` };
 }
 ```
 
@@ -251,7 +252,6 @@ function RegisterForm({ code, onSuccess }: { code: string; onSuccess: () => void
     if (outcome.kind === "banner") setBannerError(outcome.msg);
     else if (outcome.kind === "field" && outcome.field === "email") setEmailError(outcome.msg);
     else if (outcome.kind === "field" && outcome.field === "password") setPasswordError(outcome.msg);
-    else if (outcome.kind === "toast") toast.error(outcome.msg);
   }
 
   return ( /* 表单 JSX，复用 /login 样式 */ );
