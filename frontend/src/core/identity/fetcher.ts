@@ -37,6 +37,9 @@ export function resetSessionExpiredListeners(): void {
   const s = getSharedState();
   s.listeners.clear();
   s.sessionExpiredPending = false;
+  // Also drop any in-flight refresh promise so a subsequent test/scenario
+  // that calls reset doesn't observe a stale pendingRefresh from before.
+  s.pendingRefresh = null;
 }
 
 export function consumeSessionExpired(): void {
