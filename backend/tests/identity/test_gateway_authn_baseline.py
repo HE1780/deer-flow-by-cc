@@ -168,3 +168,99 @@ def test_dep_directly_raises_for_protected_path_anonymous(flag_on):
     with pytest.raises(HTTPException) as excinfo:
         require_authenticated_global(_Req())
     assert excinfo.value.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Real app smoke — confirms the dep was attached at every legacy router
+# ---------------------------------------------------------------------------
+
+
+def _build_real_app_anonymous():
+    """Build a thin FastAPI clone that shares the real gateway's route table.
+
+    We cannot call ``_inject_identity`` (i.e. ``app.add_middleware``) on the
+    real gateway ``app`` singleton after it has been started by a previous
+    TestClient call — Starlette raises ``RuntimeError: Cannot add middleware
+    after an application has started``.
+
+    Instead we create a *fresh* FastAPI application and copy the real app's
+    ``routes`` list into it.  The clone inherits every router registration
+    (including the ``dependencies=[Depends(require_authenticated_global)]``
+    attached at ``include_router`` time) but starts with a clean
+    ``middleware_stack``, so ``add_middleware`` works.
+    """
+    import importlib
+
+    app_mod = importlib.import_module("app.gateway.app")
+    real_app = app_mod.app
+
+    # Fresh app — no lifespan, no middleware yet.
+    clone = FastAPI()
+    # Share the route list directly; router registrations (incl. deps) live
+    # on each Route object, not on the app itself.
+    # ``app.routes`` is a read-only property; the underlying mutable list
+    # lives on ``app.router.routes``.
+    clone.router.routes = real_app.router.routes
+
+    _inject_identity(clone, identity=None)
+    return clone
+
+
+# One representative path per legacy router. Auth must fire before any
+# business validation, so invalid ids are fine — we never reach the handler.
+LEGACY_ROUTES = [
+    ("GET", "/api/models"),
+    ("GET", "/api/mcp/config"),
+    ("GET", "/api/memory"),
+    ("GET", "/api/skills"),
+    ("GET", "/api/threads/abc/artifacts/x.txt"),
+    ("GET", "/api/threads/abc/uploads/list"),
+    ("POST", "/api/threads/search"),         # threads
+    ("GET", "/api/threads/abc/skills"),       # thread_skills
+    ("GET", "/api/agents"),
+    ("POST", "/api/threads/abc/suggestions"),
+    ("GET", "/api/channels/"),
+    ("POST", "/api/assistants/search"),
+    ("GET", "/api/threads/abc/runs"),         # thread_runs
+    ("POST", "/api/runs/wait"),               # runs
+]
+
+
+@pytest.mark.parametrize("method,path", LEGACY_ROUTES)
+def test_real_app_legacy_route_returns_401_for_anonymous(
+    flag_on, method, path,
+):
+    app = _build_real_app_anonymous()
+    # raise_server_exceptions=False: the dep fires *before* the handler, so a
+    # 401 from the dep is a proper HTTP response, not an exception.  Setting
+    # this flag prevents unrelated handler failures (e.g. missing DB) from
+    # masking the auth check result.
+    with TestClient(app, raise_server_exceptions=False) as client:
+        r = client.request(method, path)
+    assert r.status_code == 401, (
+        f"{method} {path} returned {r.status_code}; expected 401. "
+        "Did you forget to attach require_authenticated_global to this "
+        "router's include_router call?"
+    )
+
+
+PUBLIC_ROUTES = [
+    ("GET", "/health"),
+    ("GET", "/api/auth/providers"),
+    # /api/auth/login and /api/auth/refresh exist but require POST body —
+    # we hit them with empty body and accept any non-401 (validation errors
+    # are fine, what matters is the auth dep didn't raise).
+]
+
+
+@pytest.mark.parametrize("method,path", PUBLIC_ROUTES)
+def test_real_app_public_route_does_not_401(flag_on, method, path):
+    app = _build_real_app_anonymous()
+    # raise_server_exceptions=False: we only care that the auth baseline dep
+    # did not inject a 401; handler errors (e.g. missing auth runtime) are
+    # acceptable here.
+    with TestClient(app, raise_server_exceptions=False) as client:
+        r = client.request(method, path)
+    assert r.status_code != 401, (
+        f"{method} {path} returned 401 but is on the public allowlist"
+    )
