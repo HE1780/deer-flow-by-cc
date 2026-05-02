@@ -104,7 +104,7 @@ describe("api-client — sdk fetch transport", () => {
           ? input
           : input instanceof URL
             ? input.href
-            : (input as Request).url),
+            : input.url),
     );
     expect(calls.find((u) => u.includes("/api/auth/refresh"))).toBeUndefined();
   });
@@ -148,7 +148,7 @@ describe("api-client — sdk fetch transport", () => {
           ? input
           : input instanceof URL
             ? input.href
-            : (input as Request).url;
+            : input.url;
       return url.includes("/api/auth/refresh");
     });
     expect(refreshCalls.length).toBe(1);
