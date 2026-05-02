@@ -196,11 +196,12 @@ def _build_real_app_anonymous():
 
     # Fresh app — no lifespan, no middleware yet.
     clone = FastAPI()
-    # Share the route list directly; router registrations (incl. deps) live
-    # on each Route object, not on the app itself.
-    # ``app.routes`` is a read-only property; the underlying mutable list
-    # lives on ``app.router.routes``.
-    clone.router.routes = real_app.router.routes
+    # Share the route objects (router registrations incl. deps live on each
+    # Route object, not on the app itself), but copy the list so any later
+    # mutation in real_app.router.routes does not leak into the clone (and
+    # vice versa). ``app.routes`` is a read-only property; the underlying
+    # mutable list lives on ``app.router.routes``.
+    clone.router.routes = list(real_app.router.routes)
 
     _inject_identity(clone, identity=None)
     return clone
