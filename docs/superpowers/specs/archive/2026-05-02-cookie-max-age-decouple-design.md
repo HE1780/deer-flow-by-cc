@@ -1,7 +1,11 @@
+> 📦 **归档于 2026-05-02 — 已 ship**：merged into `cc-main` as `a730bdcb`. Browser-validated manual smoke confirmed `Set-Cookie: deerflow_session=...; HttpOnly; Max-Age=604800; Path=/; SameSite=lax` (was `Max-Age=900` before fix). 28 cookie/auth/me/registration tests all green.
+
+---
+
 # Cookie Max-Age Decouple — Design
 
 **Date:** 2026-05-02
-**Status:** ⏳ Draft
+**Status:** ✅ Shipped (see banner above)
 **Owner:** backend (gateway/identity)
 **Touches:**
 - `backend/app/gateway/identity/routers/auth.py::_set_session_cookie`
