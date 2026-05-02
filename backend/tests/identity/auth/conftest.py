@@ -10,19 +10,38 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import secrets
+import socket
 import threading
 import time
+import uuid
 
+import httpx
 import pytest
+import pytest_asyncio
+import redis.asyncio as aioredis
 import uvicorn
+from alembic.config import Config
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi import FastAPI, Form, HTTPException, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from jose import jwt as jose_jwt
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from alembic import command
+from app.gateway.identity.auth.config import OIDCProviderConfig
+from app.gateway.identity.auth.lockout import LoginLockout
+from app.gateway.identity.auth.oidc import OIDCClient
+from app.gateway.identity.auth.runtime import AuthRuntime, clear_runtime, set_runtime
+from app.gateway.identity.auth.session import SessionStore
+from app.gateway.identity.bootstrap import bootstrap
+from app.gateway.identity.middlewares.identity import IdentityMiddleware
+from app.gateway.identity.routers import auth as auth_router_module
+from app.gateway.identity.settings import get_identity_settings
 
 
 def _b64url_uint(n: int) -> str:
@@ -159,8 +178,6 @@ class _ServerThread(threading.Thread):
 
 
 def _free_port() -> int:
-    import socket
-
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -176,8 +193,6 @@ def mock_idp():
     thread = _ServerThread(app, port)
     thread.start()
     # Wait for server to be ready.
-    import httpx
-
     for _ in range(50):
         try:
             httpx.get(f"{base_url}/.well-known/openid-configuration", timeout=0.2)
@@ -195,40 +210,14 @@ def mock_idp():
 # Per-test auth runtime fixtures (promoted from test_auth_router.py)
 # ---------------------------------------------------------------------------
 
-import asyncio
-import uuid
-
-import pytest
-import pytest_asyncio
-from alembic.config import Config
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import async_sessionmaker
-
-from alembic import command
-from app.gateway.identity.auth.config import OIDCProviderConfig
-from app.gateway.identity.auth.lockout import LoginLockout
-from app.gateway.identity.auth.oidc import OIDCClient
-from app.gateway.identity.auth.runtime import AuthRuntime, clear_runtime, set_runtime
-from app.gateway.identity.auth.session import SessionStore
-from app.gateway.identity.bootstrap import bootstrap
-from app.gateway.identity.middlewares.identity import IdentityMiddleware
-from app.gateway.identity.routers import auth as auth_router_module
-
 
 @pytest_asyncio.fixture
 async def fresh_db_seeded(pg_url, monkeypatch):
     monkeypatch.setenv("DEERFLOW_DATABASE_URL", pg_url)
-    from app.gateway.identity.settings import get_identity_settings
-
     get_identity_settings.cache_clear()
     cfg = Config("alembic.ini")
     cfg.set_main_option("sqlalchemy.url", pg_url)
     await asyncio.to_thread(command.upgrade, cfg, "head")
-    from sqlalchemy.ext.asyncio import create_async_engine
-
     engine = create_async_engine(pg_url)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as s:
@@ -242,8 +231,6 @@ async def fresh_db_seeded(pg_url, monkeypatch):
 
 @pytest_asyncio.fixture
 async def redis_client(redis_url):
-    import redis.asyncio as aioredis
-
     c = aioredis.from_url(redis_url, decode_responses=True)
     yield c
     await c.aclose()
