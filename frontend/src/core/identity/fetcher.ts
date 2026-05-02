@@ -2,56 +2,74 @@
 import { type IdentityError, type Permission } from "./types";
 
 type Listener = () => void;
-const listeners = new Set<Listener>();
-let sessionExpiredPending = false;
+
+/** Shared state stored on globalThis so concurrent module instances (e.g.
+ *  during vi.resetModules() in tests) all operate on the same listeners set
+ *  and singleflight slot.  The symbol key is collision-safe. */
+const _KEY = Symbol.for("deerflow.identity.fetcherState");
+type SharedState = {
+  listeners: Set<Listener>;
+  sessionExpiredPending: boolean;
+  pendingRefresh: Promise<boolean> | null;
+};
+
+function getSharedState(): SharedState {
+  const g = globalThis as Record<symbol, SharedState>;
+  g[_KEY] ??= {
+    listeners: new Set<Listener>(),
+    sessionExpiredPending: false,
+    pendingRefresh: null,
+  };
+  return g[_KEY];
+}
 
 /** Internal-only extension of RequestInit. Set to `true` on the refresh
  *  call itself and on the single post-refresh retry, so a real 401 in
  *  either of those code paths surfaces directly without recursing. */
 type InternalInit = RequestInit & { _skipRefreshOn401?: boolean };
 
-/** Singleflight slot. While a refresh is in-flight, all concurrent 401
- *  callers await the same promise. `null` once the refresh resolves so a
- *  later 401 starts a fresh attempt. */
-let pendingRefresh: Promise<boolean> | null = null;
-
 export function onSessionExpired(fn: Listener): () => void {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+  getSharedState().listeners.add(fn);
+  return () => getSharedState().listeners.delete(fn);
 }
 
 export function resetSessionExpiredListeners(): void {
-  listeners.clear();
-  sessionExpiredPending = false;
+  const s = getSharedState();
+  s.listeners.clear();
+  s.sessionExpiredPending = false;
 }
 
 export function consumeSessionExpired(): void {
-  sessionExpiredPending = false;
+  getSharedState().sessionExpiredPending = false;
 }
 
-function emitSessionExpired(): void {
-  if (sessionExpiredPending) return;
-  sessionExpiredPending = true;
-  for (const fn of listeners) fn();
+export function emitSessionExpired(): void {
+  const s = getSharedState();
+  if (s.sessionExpiredPending) return;
+  s.sessionExpiredPending = true;
+  for (const fn of s.listeners) fn();
 }
 
-/** Singleflight refresh helper. Returns `true` if the access cookie was
- *  re-issued, `false` otherwise. Internal-only — the only caller is
- *  identityFetch's 401 branch (and `identityApi.refresh` via re-export). */
-async function refreshSession(): Promise<boolean> {
-  if (pendingRefresh) return pendingRefresh;
-  pendingRefresh = identityFetch<unknown>("/api/auth/refresh", {
+/** Singleflight session refresh. Returns true if /api/auth/refresh succeeded.
+ *  Shared by identityFetch and the LangGraph SDK transport so concurrent 401s
+ *  across both fan in to a single refresh attempt. While a refresh is
+ *  in-flight, all concurrent callers await the same promise. */
+export async function refreshSession(): Promise<boolean> {
+  const s = getSharedState();
+  if (s.pendingRefresh) return s.pendingRefresh;
+  s.pendingRefresh = identityFetch<unknown>("/api/auth/refresh", {
     method: "POST",
     _skipRefreshOn401: true,
   } as InternalInit)
     .then(() => true)
     .catch(() => false)
     .finally(() => {
-      pendingRefresh = null;
+      getSharedState().pendingRefresh = null;
     });
-  return pendingRefresh;
+  return s.pendingRefresh;
 }
 
+// Backward-compat alias used by identityApi.refresh — unchanged shape.
 export { refreshSession as _refreshSessionForIdentityApi };
 
 /** Error thrown by identityFetch. Carries the IdentityError variant so callers
