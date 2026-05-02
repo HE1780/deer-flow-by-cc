@@ -1,7 +1,16 @@
+> 📦 **归档于 2026-05-02 — 已 ship**：merged into `cc-main` as `4433a412`. 5 vitest 全绿（含 `runs.join` 回归测试 — code review 抓出 `/runs/join` 误归类为 SSE 的 bug）。Browser smoke：401 → refresh-200 → retry-200 → no modal，session-expired modal 在 cookie 续期场景下不再误触发。
+>
+> 实现期间发现并落实了 spec/plan 没明确的 3 个必要扩展：
+> - `emitSessionExpired` 升为 public export（被 `sdkFetchWithRefresh` 调用）
+> - `fetcher.ts` 内部 state（listeners / pendingRefresh / sessionExpiredPending）迁到 `globalThis[Symbol.for("deerflow.identity.fetcherState")]`，让 `vi.resetModules()` 测试隔离与 prod singleflight 同一份 state
+> - `callerOptions.maxConcurrency: Infinity` —— SDK 默认 4 会序列化并发请求，破坏 singleflight；这是生产正确性修复非测试 hack
+
+---
+
 # LangGraph SDK Fetch Transport — 401 Refresh Retry
 
 **Date:** 2026-05-02
-**Status:** ⏳ Draft
+**Status:** ✅ Shipped (see banner above)
 **Owner:** frontend (core/api)
 **Touches:**
 - `frontend/src/core/api/api-client.ts` — inject `callerOptions.fetch`
