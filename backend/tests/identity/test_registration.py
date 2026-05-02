@@ -52,6 +52,7 @@ def _patch_runtime():
     rt.cookie_name = "deerflow_session"
     rt.cookie_secure = False
     rt.access_ttl_sec = 900
+    rt.refresh_ttl_sec = 604800
     rt.issuer = "deerflow"
     rt.audience = "deerflow-api"
     rt.jwt_private_key_pem = "-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----"

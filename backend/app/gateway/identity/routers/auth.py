@@ -421,7 +421,18 @@ def _issue_access_for(identity, sid: str) -> str:
 
 
 def _set_session_cookie(response: Response, access_token: str) -> None:
-    """Stamp the access token onto the response as the session cookie."""
+    """Stamp the access token onto the response as the session cookie.
+
+    Cookie lifetime intentionally tracks the Redis session TTL (refresh
+    window), NOT the access-token TTL. Browser-side cookie expiry would
+    otherwise force a re-login as soon as the access token rolls over:
+    /api/auth/refresh reads sid out of the (possibly-expired-but-still-
+    decodable) cookie, so the cookie must outlive its token. Backend
+    security is unchanged - every request still re-verifies the JWT
+    signature and checks sid in Redis.
+
+    See: docs/superpowers/specs/2026-05-02-cookie-max-age-decouple-design.md
+    """
     rt = get_runtime()
     response.set_cookie(
         rt.cookie_name,
@@ -429,7 +440,7 @@ def _set_session_cookie(response: Response, access_token: str) -> None:
         httponly=True,
         secure=rt.cookie_secure,
         samesite="lax",
-        max_age=rt.access_ttl_sec,
+        max_age=rt.refresh_ttl_sec,
         path="/",
     )
 
