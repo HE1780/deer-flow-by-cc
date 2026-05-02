@@ -3,8 +3,9 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 
+from app.gateway.auth_baseline import require_authenticated_global
 from app.gateway.config import get_gateway_config
 from app.gateway.deps import langgraph_runtime
 from app.gateway.identity import db as _identity_db
@@ -19,7 +20,6 @@ from app.gateway.identity.auth.oidc import OIDCClient
 from app.gateway.identity.auth.runtime import AuthRuntime, clear_runtime, set_runtime
 from app.gateway.identity.auth.session import SessionStore
 from app.gateway.identity.bootstrap_lock import bootstrap_with_advisory_lock
-from app.gateway.identity.tasks.org_key_rotation import start_rotation_task, stop_rotation_task
 from app.gateway.identity.db import clear_global_engine, create_engine_and_sessionmaker, set_global_engine
 from app.gateway.identity.middlewares.identity import IdentityMiddleware
 from app.gateway.identity.middlewares.tenant_scope import install_auto_filter
@@ -27,13 +27,14 @@ from app.gateway.identity.routers import admin as identity_admin_router
 from app.gateway.identity.routers import admin_stub as identity_admin_stub_router
 from app.gateway.identity.routers import admin_writes as identity_admin_writes_router
 from app.gateway.identity.routers import auth as identity_auth_router
+from app.gateway.identity.routers import dev as identity_dev_router
 from app.gateway.identity.routers import internal as identity_internal_router
 from app.gateway.identity.routers import me as identity_me_router
 from app.gateway.identity.routers import metrics as identity_metrics_router
-from app.gateway.identity.routers import dev as identity_dev_router
 from app.gateway.identity.routers import roles as identity_roles_router
 from app.gateway.identity.routers import skills_publish as identity_skills_publish_router
 from app.gateway.identity.settings import get_identity_settings
+from app.gateway.identity.tasks.org_key_rotation import start_rotation_task, stop_rotation_task
 from app.gateway.routers import (
     agents,
     artifacts,
@@ -446,46 +447,88 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Include routers
     # Models API is mounted at /api/models
-    app.include_router(models.router)
+    app.include_router(
+        models.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # MCP API is mounted at /api/mcp
-    app.include_router(mcp.router)
+    app.include_router(
+        mcp.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Memory API is mounted at /api/memory
-    app.include_router(memory.router)
+    app.include_router(
+        memory.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Skills API is mounted at /api/skills
-    app.include_router(skills.router)
+    app.include_router(
+        skills.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Artifacts API is mounted at /api/threads/{thread_id}/artifacts
-    app.include_router(artifacts.router)
+    app.include_router(
+        artifacts.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Uploads API is mounted at /api/threads/{thread_id}/uploads
-    app.include_router(uploads.router)
+    app.include_router(
+        uploads.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Thread cleanup API is mounted at /api/threads/{thread_id}
-    app.include_router(threads.router)
+    app.include_router(
+        threads.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Thread skills bind/unbind API
-    app.include_router(thread_skills.router)
+    app.include_router(
+        thread_skills.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Agents API is mounted at /api/agents
-    app.include_router(agents.router)
+    app.include_router(
+        agents.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
-    app.include_router(suggestions.router)
+    app.include_router(
+        suggestions.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Channels API is mounted at /api/channels
-    app.include_router(channels.router)
+    app.include_router(
+        channels.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Assistants compatibility API (LangGraph Platform stub)
-    app.include_router(assistants_compat.router)
+    app.include_router(
+        assistants_compat.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Thread Runs API (LangGraph Platform-compatible runs lifecycle)
-    app.include_router(thread_runs.router)
+    app.include_router(
+        thread_runs.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Stateless Runs API (stream/wait without a pre-existing thread)
-    app.include_router(runs.router)
+    app.include_router(
+        runs.router,
+        dependencies=[Depends(require_authenticated_global)],
+    )
 
     # Identity subsystem: register middleware + /api/auth + /api/me only when
     # ENABLE_IDENTITY=true. The middleware reads the auth runtime lazily so
