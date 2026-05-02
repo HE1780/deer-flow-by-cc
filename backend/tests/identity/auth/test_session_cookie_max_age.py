@@ -88,6 +88,7 @@ async def test_switch_tenant_cookie_max_age_matches_refresh_ttl(app_handle):
     # The test app_handle from auth/conftest.py only mounts auth_router. We
     # need me_router for this test, so build a parallel app handle here.
     from fastapi import FastAPI
+
     from app.gateway.identity.routers import me as me_router_module
 
     app2 = FastAPI()
