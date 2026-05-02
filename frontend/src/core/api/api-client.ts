@@ -9,9 +9,25 @@ import { getLangGraphBaseURL } from "../config";
 import { sanitizeRunStreamOptions } from "./stream-mode";
 
 /** Streaming requests must not be retried — replaying a half-consumed SSE
- *  connection corrupts message ordering. We detect them by accept header and
- *  by URL substring (defense-in-depth: the SDK might omit the header in some
- *  versions). */
+ *  connection corrupts message ordering. We detect them by URL pattern
+ *  (primary) and accept header (defense-in-depth — `prepareFetchOptions` in
+ *  langgraph-sdk 1.6.0 does NOT auto-set `accept: text/event-stream` so
+ *  header detection alone is unreliable).
+ *
+ *  SDK 1.6.0 streaming endpoints (verified from dist/client.js):
+ *    - POST `/runs/stream`                          (runs.stream stateless)
+ *    - POST `/threads/{tid}/runs/stream`            (runs.stream)
+ *    - GET  `/runs/{rid}/stream`                    (joinStream stateless)
+ *    - GET  `/threads/{tid}/runs/{rid}/stream`      (joinStream)
+ *    - GET  `/threads/{tid}/stream`                 (assistants stream)
+ *
+ *  Non-streaming endpoint that LOOKS similar:
+ *    - GET  `/threads/{tid}/runs/{rid}/join`        (runs.join — blocking wait)
+ *
+ *  Match: pathname ends in `/stream` (with optional query string). Must NOT
+ *  match `/runs/{rid}/join`, or 401s on runs.join would skip refresh-retry. */
+const STREAM_PATH_RE = /\/stream(\?|$)/;
+
 function isStreamingRequest(input: RequestInfo | URL, init?: RequestInit): boolean {
   const url =
     typeof input === "string"
@@ -19,7 +35,7 @@ function isStreamingRequest(input: RequestInfo | URL, init?: RequestInit): boole
       : input instanceof URL
         ? input.href
         : input.url;
-  if (url.includes("/runs/stream") || url.includes("/runs/join")) return true;
+  if (STREAM_PATH_RE.test(url)) return true;
 
   const headers = init?.headers;
   if (!headers) return false;

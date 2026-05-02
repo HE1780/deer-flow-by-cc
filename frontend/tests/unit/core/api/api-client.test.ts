@@ -109,6 +109,30 @@ describe("api-client — sdk fetch transport", () => {
     expect(calls.find((u) => u.includes("/api/auth/refresh"))).toBeUndefined();
   });
 
+  it("retries runs.join (non-streaming /join URL) on 401 — must NOT be classified as SSE", async () => {
+    // runs.join URL is /threads/{tid}/runs/{rid}/join — it contains the
+    // substring `/runs/` and an `/join` segment but is NOT streaming.
+    // Earlier impl mistakenly matched `/runs/join` as streaming, which
+    // would skip refresh-and-retry on a token-rollover during a blocking
+    // wait. Defends against re-introducing that classification bug.
+    const mock = makeSequencedFetchMock({
+      "GET http://localhost:3000/api/langgraph-compat/threads/abc/runs/xyz/join": [
+        empty(401),
+        json(200, { run_id: "xyz", status: "success" }),
+      ],
+      "POST /api/auth/refresh": [json(200, { ok: true })],
+    });
+    vi.stubGlobal("fetch", mock);
+
+    const { getAPIClient } = await import("@/core/api/api-client");
+    const result = await getAPIClient().runs.join("abc", "xyz");
+
+    expect(result).toEqual({ run_id: "xyz", status: "success" });
+    // Original 401 + refresh + retry = 3 calls (the proof that runs.join
+    // went through the refresh-and-retry path, not classified as SSE).
+    expect(mock).toHaveBeenCalledTimes(3);
+  });
+
   it("emits session-expired when refresh itself returns 401", async () => {
     const mock = makeSequencedFetchMock({
       "POST http://localhost:3000/api/langgraph-compat/threads/search": [empty(401)],
