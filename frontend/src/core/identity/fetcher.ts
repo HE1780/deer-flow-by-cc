@@ -35,10 +35,11 @@ function emitSessionExpired(): void {
   for (const fn of listeners) fn();
 }
 
-/** Singleflight refresh helper. Returns `true` if the access cookie was
- *  re-issued, `false` otherwise. Internal-only — the only caller is
- *  identityFetch's 401 branch (and `identityApi.refresh` via re-export). */
-async function refreshSession(): Promise<boolean> {
+/** Singleflight session refresh. Returns true if /api/auth/refresh succeeded.
+ *  Shared by identityFetch and the LangGraph SDK transport so concurrent 401s
+ *  across both fan in to a single refresh attempt. While a refresh is
+ *  in-flight, all concurrent callers await the same promise. */
+export async function refreshSession(): Promise<boolean> {
   if (pendingRefresh) return pendingRefresh;
   pendingRefresh = identityFetch<unknown>("/api/auth/refresh", {
     method: "POST",
@@ -52,6 +53,7 @@ async function refreshSession(): Promise<boolean> {
   return pendingRefresh;
 }
 
+// Backward-compat alias used by identityApi.refresh — unchanged shape.
 export { refreshSession as _refreshSessionForIdentityApi };
 
 /** Error thrown by identityFetch. Carries the IdentityError variant so callers
