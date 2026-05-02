@@ -1,7 +1,13 @@
+> 📦 **归档于 2026-05-02 — 已 ship**：merged into `cc-main` as `3f9d35f5`. 23 pytest 全绿（含 14 legacy router 真实应用 smoke）。Browser-validated 6 endpoints × {logged-out, logged-in}：`/api/models`, `/api/memory`, `/api/skills`, `/api/threads/dummy/skills` 在 logged-out 时由 200 改为 401，logged-in 仍 200；`/api/auth/providers`, `/health` 维持 200。Plan 中已记录的 spec 修正（`/api/channels/webhook` 不是真路径）落实到 PUBLIC_PREFIXES 中。
+>
+> 实施额外补丁：测试用 `_build_real_app_anonymous()` 共享 `real_app.router.routes` 进 fresh FastAPI clone（绕过 Starlette "cannot add middleware after start" 限制），`raise_server_exceptions=False`（让 handler 内部错误不掩盖 auth dep 行为）。两者都是测试基础设施层面的解决，不影响 prod。
+
+---
+
 # Gateway Routes Authentication Baseline
 
 **Date:** 2026-05-02
-**Status:** ⏳ Draft
+**Status:** ✅ Shipped (see banner above)
 **Owner:** backend (gateway)
 **Touches:**
 - `backend/app/gateway/app.py` — global auth dependency on legacy routers
