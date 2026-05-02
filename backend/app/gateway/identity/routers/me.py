@@ -170,19 +170,13 @@ async def switch_tenant(
     if identity.session_id:
         await rt.session_store.update_tenant(identity.session_id, tenant.id)
 
-    # Re-issue token.
-    from app.gateway.identity.routers.auth import _issue_access_for
+    # Re-issue token using the shared helper so cookie attributes (esp.
+    # max_age) stay aligned with /api/auth/login. Helper imports are local
+    # to avoid a circular dependency between me.py and auth.py.
+    from app.gateway.identity.routers.auth import _issue_access_for, _set_session_cookie
 
     new_token = _issue_access_for(new_identity, identity.session_id or "")
-    response.set_cookie(
-        rt.cookie_name,
-        new_token,
-        httponly=True,
-        secure=rt.cookie_secure,
-        samesite="lax",
-        max_age=rt.access_ttl_sec,
-        path="/",
-    )
+    _set_session_cookie(response, new_token)
     return {"access_token": new_token, "token_type": "Bearer", "expires_in": rt.access_ttl_sec}
 
 
