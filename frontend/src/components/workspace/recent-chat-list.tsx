@@ -47,6 +47,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
+  getExportMessages,
 } from "@/core/threads/export";
 import {
   useDeleteThread,
@@ -142,7 +143,9 @@ export function RecentChatList() {
         const state = await apiClient.threads.getState<AgentThreadState>(
           thread.thread_id,
         );
-        const messages = state.values?.messages ?? [];
+        const messages = getExportMessages({
+          values: state.values,
+        });
         if (messages.length === 0) {
           toast.error(t.conversation.noMessages);
           return;

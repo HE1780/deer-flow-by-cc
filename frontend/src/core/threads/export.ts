@@ -9,7 +9,7 @@ import {
 } from "../messages/utils";
 
 import type { AgentThread } from "./types";
-import { titleOfThread } from "./utils";
+import { mergeThreadMessages, titleOfThread } from "./utils";
 
 function formatMessageContent(message: Message): string {
   const text = extractContentFromMessage(message);
@@ -137,4 +137,11 @@ export function exportThreadAsJSON(thread: AgentThread, messages: Message[]) {
   const json = formatThreadAsJSON(thread, messages);
   const filename = `${sanitizeFilename(titleOfThread(thread))}.json`;
   downloadAsFile(json, filename, "application/json;charset=utf-8");
+}
+
+export function getExportMessages(thread: Pick<AgentThread, "values">) {
+  return mergeThreadMessages(
+    thread.values.archived_messages,
+    thread.values.messages ?? [],
+  );
 }

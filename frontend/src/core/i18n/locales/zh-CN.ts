@@ -252,6 +252,9 @@ export const zhCN: Translations = {
   conversation: {
     noMessages: "还没有消息",
     startConversation: "开始新的对话以查看消息",
+    earlyMessages: "早期对话",
+    earlyMessagesDescription: (count) =>
+      `有 ${count} 条已归档消息被摘要移出了当前上下文。`,
   },
 
   // Chats

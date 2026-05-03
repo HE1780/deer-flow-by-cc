@@ -46,6 +46,30 @@ export function textOfMessage(message: Message) {
   return null;
 }
 
+export function mergeThreadMessages(
+  archivedMessages: Message[] | undefined,
+  messages: Message[],
+) {
+  const merged: Message[] = [];
+  const seenIds = new Set<string>();
+
+  for (const message of [...(archivedMessages ?? []), ...messages]) {
+    if (!message) {
+      continue;
+    }
+    const messageId = typeof message.id === "string" ? message.id : undefined;
+    if (messageId) {
+      if (seenIds.has(messageId)) {
+        continue;
+      }
+      seenIds.add(messageId);
+    }
+    merged.push(message);
+  }
+
+  return merged;
+}
+
 export function titleOfThread(thread: AgentThread) {
   return thread.values?.title ?? "Untitled";
 }

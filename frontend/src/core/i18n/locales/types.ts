@@ -198,6 +198,8 @@ export interface Translations {
   conversation: {
     noMessages: string;
     startConversation: string;
+    earlyMessages: string;
+    earlyMessagesDescription: (count: number) => string;
   };
 
   // Chats

@@ -264,6 +264,9 @@ export const enUS: Translations = {
   conversation: {
     noMessages: "No messages yet",
     startConversation: "Start a conversation to see messages here",
+    earlyMessages: "Earlier conversation",
+    earlyMessagesDescription: (count) =>
+      `${count} archived messages were summarized out of the live context.`,
   },
 
   // Chats

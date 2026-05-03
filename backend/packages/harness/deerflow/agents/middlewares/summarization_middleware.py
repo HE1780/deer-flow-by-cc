@@ -9,12 +9,15 @@ from typing import Any, Protocol, runtime_checkable
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import SummarizationMiddleware
-from langchain_core.messages import AIMessage, AnyMessage, RemoveMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, RemoveMessage, ToolMessage
 from langgraph.config import get_config
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
+
+SUMMARY_MARKER_KEY = "__deerflow_summary"
+SUMMARY_TEXT_KEY = "__deerflow_summary_text"
 
 
 @dataclass(frozen=True)
@@ -136,8 +139,9 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             return None
 
         messages_to_summarize, preserved_messages = self._partition_with_skill_rescue(messages, cutoff_index)
-        self._fire_hooks(messages_to_summarize, preserved_messages, runtime)
-        summary = self._create_summary(messages_to_summarize)
+        fresh_to_summarize, prior_summary = self._strip_prior_summaries(messages_to_summarize)
+        self._fire_hooks(fresh_to_summarize, preserved_messages, runtime)
+        summary = self._create_summary(fresh_to_summarize, prior_summary=prior_summary)
         new_messages = self._build_new_messages(summary)
 
         return {
@@ -145,7 +149,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 RemoveMessage(id=REMOVE_ALL_MESSAGES),
                 *new_messages,
                 *preserved_messages,
-            ]
+            ],
+            "archived_messages": fresh_to_summarize,
         }
 
     async def _amaybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
@@ -161,8 +166,9 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             return None
 
         messages_to_summarize, preserved_messages = self._partition_with_skill_rescue(messages, cutoff_index)
-        self._fire_hooks(messages_to_summarize, preserved_messages, runtime)
-        summary = await self._acreate_summary(messages_to_summarize)
+        fresh_to_summarize, prior_summary = self._strip_prior_summaries(messages_to_summarize)
+        self._fire_hooks(fresh_to_summarize, preserved_messages, runtime)
+        summary = await self._acreate_summary(fresh_to_summarize, prior_summary=prior_summary)
         new_messages = self._build_new_messages(summary)
 
         return {
@@ -170,7 +176,8 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                 RemoveMessage(id=REMOVE_ALL_MESSAGES),
                 *new_messages,
                 *preserved_messages,
-            ]
+            ],
+            "archived_messages": fresh_to_summarize,
         }
 
     def _partition_with_skill_rescue(
@@ -321,6 +328,113 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             return False
         normalized_root = skills_root.rstrip("/")
         return path == normalized_root or path.startswith(normalized_root + "/")
+
+    def _strip_prior_summaries(
+        self,
+        messages_to_summarize: list[AnyMessage],
+    ) -> tuple[list[AnyMessage], str | None]:
+        """Pull DeerFlow summary stubs out of the to_summarize set.
+
+        Why: without this, every summarization sweep folds the previous summary's
+        synthetic HumanMessage back into the next prompt, so each round chips
+        away at the real conversation and the agent loses grounding.
+
+        Returns the to_summarize list with summary stubs removed, plus the most
+        recent stub's summary text (if any) so the caller can pass it as a
+        ``prior_summary`` seed into _create_summary.
+        """
+        if not messages_to_summarize:
+            return messages_to_summarize, None
+
+        fresh: list[AnyMessage] = []
+        prior_summary: str | None = None
+        for msg in messages_to_summarize:
+            kwargs = getattr(msg, "additional_kwargs", None) or {}
+            if kwargs.get(SUMMARY_MARKER_KEY):
+                text = kwargs.get(SUMMARY_TEXT_KEY)
+                if isinstance(text, str) and text:
+                    prior_summary = text
+                continue
+            fresh.append(msg)
+        return fresh, prior_summary
+
+    def _build_new_messages(self, summary: str) -> list[HumanMessage]:
+        """Inject the summary as a HumanMessage tagged so the next pass can skip it."""
+        return [
+            HumanMessage(
+                content=f"Here is a summary of the conversation to date:\n\n{summary}",
+                additional_kwargs={
+                    SUMMARY_MARKER_KEY: True,
+                    SUMMARY_TEXT_KEY: summary,
+                },
+            )
+        ]
+
+    def _create_summary(
+        self,
+        messages_to_summarize: list[AnyMessage],
+        *,
+        prior_summary: str | None = None,
+    ) -> str:
+        """Synchronous summary path that respects an optional prior summary seed."""
+        if prior_summary is None:
+            return super()._create_summary(messages_to_summarize)
+        formatted = self._format_prior_summary_prompt(messages_to_summarize, prior_summary)
+        if formatted is None:
+            return prior_summary
+        try:
+            response = self.model.invoke(formatted)
+            return response.text.strip()
+        except Exception as exc:
+            logger.exception("Summary invocation failed; falling back to prior summary")
+            return f"{prior_summary}\n\n[Note: failed to integrate new turns: {exc!s}]"
+
+    async def _acreate_summary(
+        self,
+        messages_to_summarize: list[AnyMessage],
+        *,
+        prior_summary: str | None = None,
+    ) -> str:
+        """Async summary path mirroring _create_summary."""
+        if prior_summary is None:
+            return await super()._acreate_summary(messages_to_summarize)
+        formatted = self._format_prior_summary_prompt(messages_to_summarize, prior_summary)
+        if formatted is None:
+            return prior_summary
+        try:
+            response = await self.model.ainvoke(formatted)
+            return response.text.strip()
+        except Exception as exc:
+            logger.exception("Async summary invocation failed; falling back to prior summary")
+            return f"{prior_summary}\n\n[Note: failed to integrate new turns: {exc!s}]"
+
+    def _format_prior_summary_prompt(
+        self,
+        messages_to_summarize: list[AnyMessage],
+        prior_summary: str,
+    ) -> Any | None:
+        """Build a summary prompt that seeds the model with the prior summary.
+
+        Returns ``None`` when there are no fresh turns to fold in (caller should
+        return ``prior_summary`` unchanged).
+        """
+        from langchain_core.messages.utils import get_buffer_string
+
+        trimmed = self._trim_messages_for_summary(messages_to_summarize)
+        if not trimmed:
+            return None
+
+        new_conversation = get_buffer_string(trimmed)
+        prompt_payload = (
+            "Existing summary of earlier conversation:\n"
+            f"{prior_summary}\n\n"
+            "New conversation since then:\n"
+            f"{new_conversation}\n\n"
+            "Produce a single updated summary that integrates both. "
+            "Do not drop facts from the existing summary unless they are clearly "
+            "superseded by the new conversation."
+        )
+        return self.summary_prompt.format(messages=prompt_payload)
 
     def _fire_hooks(
         self,

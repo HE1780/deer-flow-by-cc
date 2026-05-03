@@ -1,6 +1,7 @@
 from typing import Annotated, Any, NotRequired, TypedDict
 
 from langchain.agents import AgentState
+from langchain_core.messages import AnyMessage
 
 
 class SandboxState(TypedDict):
@@ -45,11 +46,39 @@ def merge_viewed_images(existing: dict[str, ViewedImageData] | None, new: dict[s
     return {**existing, **new}
 
 
+def merge_archived_messages(
+    existing: list[AnyMessage] | None,
+    new: list[AnyMessage] | None,
+) -> list[AnyMessage]:
+    """Reducer for archived messages - appends while deduplicating by message id."""
+    if existing is None:
+        existing = []
+    if not new:
+        return existing
+
+    merged = list(existing)
+    seen_ids = {
+        message.id
+        for message in merged
+        if getattr(message, "id", None) is not None
+    }
+
+    for message in new:
+        message_id = getattr(message, "id", None)
+        if message_id is not None and message_id in seen_ids:
+            continue
+        merged.append(message)
+        if message_id is not None:
+            seen_ids.add(message_id)
+    return merged
+
+
 class ThreadState(AgentState):
     sandbox: NotRequired[SandboxState | None]
     thread_data: NotRequired[ThreadDataState | None]
     title: NotRequired[str | None]
     artifacts: Annotated[list[str], merge_artifacts]
+    archived_messages: Annotated[list[AnyMessage], merge_archived_messages]
     todos: NotRequired[list | None]
     uploaded_files: NotRequired[list[dict] | None]
     viewed_images: Annotated[dict[str, ViewedImageData], merge_viewed_images]  # image_path -> {base64, mime_type}

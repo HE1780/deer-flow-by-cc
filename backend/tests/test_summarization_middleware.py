@@ -7,7 +7,12 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, ToolMessage
 
 from deerflow.agents.memory.summarization_hook import memory_flush_hook
-from deerflow.agents.middlewares.summarization_middleware import DeerFlowSummarizationMiddleware, SummarizationEvent
+from deerflow.agents.middlewares.summarization_middleware import (
+    SUMMARY_MARKER_KEY,
+    SUMMARY_TEXT_KEY,
+    DeerFlowSummarizationMiddleware,
+    SummarizationEvent,
+)
 from deerflow.config.memory_config import MemoryConfig
 
 
@@ -87,6 +92,7 @@ def test_before_summarization_hook_receives_messages_before_compression() -> Non
     assert captured[0].thread_id == "thread-1"
     assert captured[0].agent_name is None
     assert isinstance(result["messages"][0], RemoveMessage)
+    assert [message.content for message in result["archived_messages"]] == ["user-1", "assistant-1"]
     assert result["messages"][1].content.startswith("Here is a summary")
 
 
@@ -135,6 +141,17 @@ async def test_abefore_model_calls_hooks_same_as_sync() -> None:
 
     assert len(captured) == 1
     assert [message.content for message in captured[0].messages_to_summarize] == ["user-1", "assistant-1"]
+
+
+def test_summarization_returns_archived_messages_separately_from_context() -> None:
+    middleware = _middleware()
+
+    result = middleware.before_model({"messages": _messages()}, _runtime())
+
+    assert [message.content for message in result["archived_messages"]] == ["user-1", "assistant-1"]
+    emitted_messages = result["messages"]
+    assert isinstance(emitted_messages[0], RemoveMessage)
+    assert [message.content for message in emitted_messages[2:]] == ["user-2", "assistant-2"]
 
 
 def test_memory_flush_hook_skips_when_memory_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -488,6 +505,97 @@ def test_skill_rescue_only_preserves_skill_calls_with_matched_tool_results() -> 
     assert [tc["id"] for tc in summarized_ai.tool_calls] == ["skill-2"]
     assert any(isinstance(m, ToolMessage) and m.content == "alpha skill body" for m in preserved)
     assert not any(isinstance(m, ToolMessage) and getattr(m, "tool_call_id", None) == "skill-2" for m in preserved)
+
+
+def test_summary_message_is_tagged_for_future_skip() -> None:
+    middleware = _middleware()
+
+    result = middleware.before_model({"messages": _messages()}, _runtime())
+
+    summary_msg = result["messages"][1]
+    assert isinstance(summary_msg, HumanMessage)
+    kwargs = summary_msg.additional_kwargs or {}
+    assert kwargs.get(SUMMARY_MARKER_KEY) is True
+    assert kwargs.get(SUMMARY_TEXT_KEY) == "compressed summary"
+
+
+def test_cascading_summary_does_not_recurse_prior_summary() -> None:
+    """Old summary stubs are stripped from to_summarize and not re-fed into the prompt."""
+    model = MagicMock()
+    model.invoke.return_value = SimpleNamespace(text="updated summary")
+    middleware = DeerFlowSummarizationMiddleware(
+        model=model,
+        trigger=("messages", 6),
+        keep=("messages", 2),
+        token_counter=len,
+    )
+
+    prior_stub = HumanMessage(
+        content="Here is a summary of the conversation to date:\n\nold summary text",
+        additional_kwargs={SUMMARY_MARKER_KEY: True, SUMMARY_TEXT_KEY: "old summary text"},
+    )
+    messages = [
+        prior_stub,
+        HumanMessage(content="user-mid"),
+        AIMessage(content="assistant-mid"),
+        HumanMessage(content="user-tail"),
+        HumanMessage(content="user-new"),
+        AIMessage(content="assistant-new"),
+    ]
+
+    result = middleware.before_model({"messages": messages}, _runtime())
+
+    assert all(
+        not (getattr(m, "additional_kwargs", None) or {}).get(SUMMARY_MARKER_KEY)
+        for m in result["archived_messages"]
+    ), "prior summary stub must not be archived as a real message"
+    archived_contents = [m.content for m in result["archived_messages"]]
+    assert "Here is a summary of the conversation to date:" not in "\n".join(archived_contents)
+    assert "user-mid" in archived_contents and "assistant-mid" in archived_contents
+
+    formatted = model.invoke.call_args.args[0]
+    assert "old summary text" in formatted, "prior summary should seed the prompt as context"
+    assert "user-mid" in formatted, "fresh turns must still be summarized"
+    assert formatted.count("Here is a summary of the conversation to date:") == 0, (
+        "prior summary stub text must not be re-injected as a fresh turn"
+    )
+
+
+@pytest.mark.anyio
+async def test_acascading_summary_does_not_recurse_prior_summary() -> None:
+    async def _ainvoke(_prompt):
+        return SimpleNamespace(text="updated summary")
+
+    model = MagicMock()
+    model.ainvoke.side_effect = _ainvoke
+    middleware = DeerFlowSummarizationMiddleware(
+        model=model,
+        trigger=("messages", 6),
+        keep=("messages", 2),
+        token_counter=len,
+    )
+
+    prior_stub = HumanMessage(
+        content="Here is a summary of the conversation to date:\n\nold async summary",
+        additional_kwargs={SUMMARY_MARKER_KEY: True, SUMMARY_TEXT_KEY: "old async summary"},
+    )
+    messages = [
+        prior_stub,
+        HumanMessage(content="user-mid"),
+        AIMessage(content="assistant-mid"),
+        HumanMessage(content="user-tail"),
+        HumanMessage(content="user-new"),
+        AIMessage(content="assistant-new"),
+    ]
+
+    result = await middleware.abefore_model({"messages": messages}, _runtime())
+
+    archived_contents = [m.content for m in result["archived_messages"]]
+    assert "Here is a summary of the conversation to date:" not in "\n".join(archived_contents)
+    assert "user-mid" in archived_contents
+    formatted = model.ainvoke.call_args.args[0]
+    assert "old async summary" in formatted
+    assert formatted.count("Here is a summary of the conversation to date:") == 0
 
 
 def test_memory_flush_hook_preserves_agent_scoped_memory(monkeypatch: pytest.MonkeyPatch) -> None:

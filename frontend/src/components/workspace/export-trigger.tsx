@@ -15,6 +15,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
+  getExportMessages,
 } from "@/core/threads/export";
 import type { AgentThread } from "@/core/threads/types";
 
@@ -25,7 +26,7 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
   const { t } = useI18n();
   const { thread } = useThread();
 
-  const messages = thread.messages;
+  const messages = getExportMessages({ values: thread.values });
 
   const handleExport = useCallback(
     (format: "markdown" | "json") => {
