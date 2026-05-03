@@ -1,20 +1,166 @@
-# 🦌 DeerFlow - 2.0
+# 🦌 deer-flow-by-cc — 自托管多租户版 DeerFlow
 
-[English](./README.md) | 中文 | [日本語](./README_ja.md) | [Français](./README_fr.md) | [Русский](./README_ru.md)
+[English](./README.md) | 中文 | [Français](./README_fr.md) | [Русский](./README_ru.md)
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Upstream: bytedance/deer-flow](https://img.shields.io/badge/Upstream-bytedance%2Fdeer--flow-blue)](https://github.com/bytedance/deer-flow)
 
-<a href="https://trendshift.io/repositories/14699" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14699" alt="bytedance%2Fdeer-flow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-> 2026 年 2 月 28 日，DeerFlow 2 发布后登上 GitHub Trending 第 1 名。非常感谢社区的支持，这是大家一起做到的。
+> [DeerFlow](https://github.com/bytedance/deer-flow) 的生产可用自托管 fork，补齐了 **企业身份**、**多租户隔离** 和 **安全加固**——让你能把 DeerFlow 真正部署给团队私有使用，同时不丢失上游的研究、子 agent 和 skill 能力。
+
+本仓库是 [`bytedance/deer-flow`](https://github.com/bytedance/deer-flow) 的社区 fork。我们紧跟上游（上游 README 里的所有功能在这里都能用），并补齐了一套小团队真正把 DeerFlow 当作共享服务部署时缺的那部分：真正的登录、租户隔离、审计、会话韧性、skill 治理。
+
+如果你只是想在本地用托管模型 API 评估 DeerFlow，[上游仓库](https://github.com/bytedance/deer-flow) 是更合适的起点。如果你要把 DeerFlow 部署给团队使用，请继续往下读。
+
+---
+
+## 🚀 这个 fork 增加了什么
+
+所有增量都是**可选启用**的。当 `ENABLE_IDENTITY=false`（默认值）时，这个 fork 的行为和上游完全一致——所有改动都处于休眠状态。
+
+### 🔐 企业身份系统
+
+- **OIDC 登录 + 密码登录并存**（Okta / Azure AD / Keycloak 等）—— `/api/auth/oidc/{provider}/login` 走 SSO，密码登录覆盖服务账号和应急通道。
+- **基于注册码的自助注册**——管理员生成一次性注册码（`POST /api/tenants/{tid}/registration-codes`），用户在 `/register` 页面兑换。不依赖邮件服务器。
+- **首次启动管理员引导**——`DEERFLOW_BOOTSTRAP_ADMIN_EMAIL` 在启动时幂等地创建平台管理员；管理员可以从 UI 直接改密。
+- **JWT RS256**——`make identity-keys` 生成 2048 位密钥对到 `$DEERFLOW_HOME/_system/`；网关在缺失时会自动生成。
+
+### 🛡️ 安全加固
+
+- **Gateway 鉴权基线**——14 个 legacy `/api/*` 路由全部默认要求登录；`PUBLIC_PREFIXES` 是显式 allowlist（auth flow / `/health` / `/metrics` / internal/audit）。修复了"开了 `ENABLE_IDENTITY=true` 但旧路由仍可未鉴权访问"的 P0 漏洞。
+- **会话韧性**——401 响应会透明触发 singleflight refresh + retry，而不是直接弹"会话已过期"。identity fetch 层和 LangGraph SDK fetch transport 共享同一个 singleflight。
+- **Cookie TTL 解耦**——`deerflow_session` 的 `Max-Age` 现在跟随 `refresh_ttl_sec`（7 天）而不是 `access_ttl_sec`（15 分钟），合上电脑过夜不再被强制下线。
+- **审计管道**——所有鉴权写操作、RBAC 拒绝、登录/登出、tool 拒绝都走 `AuditMiddleware` → `audit_logs` 表；Postgres 不可达时关键事件落到磁盘 JSONL；CSV 导出支持游标分页。
+
+### 🏢 多租户隔离
+
+- **按租户切的文件系统布局**（`$DEER_FLOW_HOME` 下）——sandbox bind mount、thread 数据、上传、产物、租户作用域 skill 都物理隔离。跨租户访问在 gateway、sandbox mount、path guard 三层都会被拒绝。
+- **Thread store 按 user 切 namespace**——共享部署下列 thread 不再跨用户串号。
+- **租户作用域的注册码与角色**——新增 `workspace_member` 角色，权限粒度适配受邀用户。
+
+### 🧩 Skill 与 Agent 治理
+
+- **Skill 审批工作流**——pending skill 走 `GET /api/admin/skills/pending` → approve/reject；admin UI 提供 pending / reviewed（rejected + archived）两个 tab。
+- **Skill 绑定到 thread**——通过 `POST /api/threads/{tid}/skills` 绑定 skill 到某个 thread，chat 页显示 `/skill-name` 徽章，"Load to chat" 链接端到端贯通。
+- **Custom agent 编辑页**——从 UI 直接编辑 `description / model / SOUL / tool_groups / skills / org_key_env`，`tool_groups` 下拉由 `GET /api/tool-groups` 驱动。
+- **Admin 页面**——模型管理、改密、admin 区域 i18n。
+
+### ⚙️ Runtime 稳定性
+
+- **`deerflow.runtime.main_loop` 单例**——Gateway mode 通过 lifespan 注入进程级 event loop，根治了长会话和子 agent 跨边界时反复出现的 `Event loop is closed`。
+- **Summarization 级联截断**——旧摘要在 `additional_kwargs` 上打 marker，下一轮 partition 时剥掉，把摘要文本作为 `prior_summary` seed 注入 prompt，而不是被反复重摘要导致信息无限稀释。
+- **Tool-call 恢复**——`LoopDetectionMiddleware` 的 hard-stop 现在会在同一轮里给孤儿 `ToolMessage` 发 `RemoveMessage`，避免严格校验 `tool_call_id` 的模型抛 400。
+
+### 💬 前端打磨
+
+- **401 弹窗合并**——并发 401 不再叠出三个"会话已过期"。
+- **聊天界面修复**——`todo_completion_reminder` 跟 `todo_reminder` 一起被过滤，LLM 错误帧不再伪装成用户消息出现在聊天里。
+- **i18n 更新**——模型管理标签、注册页文案、欢迎页营销文案清理。
+
+> **想看完整细节？** 每一个已落地的改动都有 spec 在 [`docs/superpowers/specs/archive/`](docs/superpowers/specs/archive/)，对应的实施计划在 [`docs/plans/archive/`](docs/plans/archive/)。当前 roadmap 在 [`docs/superpowers/specs/`](docs/superpowers/specs/)。
+
+---
+
+## 🤔 我应该用哪个版本？
+
+| 你的场景 | 用上游 `bytedance/deer-flow` | 用 `deer-flow-by-cc` |
+|---|:---:|:---:|
+| 单人本地开发 | ✅ | — |
+| 笔记本上做评估 / 演示 | ✅ | — |
+| 给团队（2–50 人）自托管 | — | ✅ |
+| 需要真正的登录（OIDC 或密码） | — | ✅ |
+| 需要租户数据隔离 | — | ✅ |
+| 需要审计日志满足合规 | — | ✅ |
+| 需要 skill 审批流以后再上架 | — | ✅ |
+| 已经在用上游而且不需要以上能力 | ✅ | — |
+
+**升级路径：** 这个 fork 是上游的严格超集。切过来只需要换 `git remote` 然后 `make db-upgrade`；保持 `ENABLE_IDENTITY=false` 时行为与上游完全一致。
+
+---
+
+## ⚡ 快速开始：自托管模式
+
+完整的快速开始（Docker / 本地开发 / sandbox）见下方 [上游文档](#-上游-deerflow-文档)。本节只覆盖**启用 identity** 这条独有路径。
+
+### 1. 准备依赖
+
+```bash
+# docker/docker-compose.yaml 已经把 Postgres 16 + Redis 7 作为可选服务一起打进来了
+docker compose up -d postgres redis
+```
+
+### 2. 跑数据库迁移
+
+```bash
+cd backend && make db-upgrade
+```
+
+### 3. 生成 JWT 密钥
+
+```bash
+cd backend && make identity-keys
+# → 把 RS256 密钥对写到 $DEERFLOW_HOME/_system/jwt_{private,public}.pem
+```
+
+### 4. 设置环境变量
+
+```bash
+# .env
+ENABLE_IDENTITY=true
+DEERFLOW_DATABASE_URL=postgresql+asyncpg://deerflow:***@localhost:5432/deerflow
+DEERFLOW_REDIS_URL=redis://localhost:6379/0
+DEERFLOW_BOOTSTRAP_ADMIN_EMAIL=you@example.com   # 创建首个平台管理员
+REGISTRATION_CODE_EXPIRES_DAYS=7                  # 默认 7，区间 1–90
+```
+
+### 5.（可选）配置 OIDC
+
+```bash
+cp config/identity.yaml.example config/identity.yaml
+# 至少填一个 provider —— $VAR 引用从环境变量解析
+```
+
+### 6. 启动网关并接入团队
+
+```bash
+make dev   # 或者 make up 上 Docker 生产部署
+```
+
+接下来：
+
+1. Bootstrap 管理员用启动日志里打印的密码（或 OIDC）登录 `/login`。
+2. 管理员生成注册码：`POST /api/tenants/{tid}/registration-codes`。
+3. 团队成员访问 `/register`，粘贴注册码、设密码，进入。
+
+完整设计（包含审计保留期、RBAC scope、存储布局）见 [`docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`](docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md)。
+
+---
+
+## 🗺️ Roadmap 与状态
+
+| 范围 | 状态 | 说明 |
+|---|---|---|
+| Identity 基础（M1–M7） | ✅ 已交付 | OIDC、密码、注册码、RBAC、审计、多租户文件系统 |
+| 会话刷新韧性 | ✅ 已交付 | `identityFetch` + LangGraph SDK 共享 401-refresh-retry |
+| Gateway 鉴权基线（P0） | ✅ 已交付 | 14 个 legacy 路由全部锁死 |
+| Summarization 级联修复 | ✅ 已交付 | 旧摘要打 marker 不再被重摘要 |
+| Skill 审批工作流 | ✅ 已交付 | Pending / reviewed tab + 绑 thread |
+| 注册时的邮件通知 | 🟡 暂缓 | 当前注册码靠你自己的渠道分发 |
+| 自托管一键部署 epic | 🔜 规划中 | 单独立项跟踪 |
+
+---
+
+## 📦 上游 DeerFlow 文档
+
+下面这条线以下都是上游文档，原文保留以保证信息源的单一性。Skills、sandbox、sub-agents、MCP、IM 渠道、内嵌 Python client——全部和上游描述完全一致。
+
+> [!NOTE]
+> **DeerFlow 2.0 是一次彻底重写。** 它和 v1 没有共用代码。如果你要找的是最初的 Deep Research 框架，可以前往 [`1.x` 分支](https://github.com/bytedance/deer-flow/tree/main-1.x)。那里仍然欢迎贡献；当前的主要开发已经转向 2.0。
 
 DeerFlow（**D**eep **E**xploration and **E**fficient **R**esearch **Flow**）是一个开源的 **super agent harness**。它把 **sub-agents**、**memory** 和 **sandbox** 组织在一起，再配合可扩展的 **skills**，让 agent 可以完成几乎任何事情。
 
 https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
-
-> [!NOTE]
-> **DeerFlow 2.0 是一次彻底重写。** 它和 v1 没有共用代码。如果你要找的是最初的 Deep Research 框架，可以前往 [`1.x` 分支](https://github.com/bytedance/deer-flow/tree/main-1.x)。那里仍然欢迎贡献；当前的主要开发已经转向 2.0。
 
 ## 官网
 
@@ -32,7 +178,12 @@ https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
 
 ## 目录
 
-- [🦌 DeerFlow - 2.0](#-deerflow---20)
+- [🦌 deer-flow-by-cc — 自托管多租户版 DeerFlow](#-deer-flow-by-cc--自托管多租户版-deerflow)
+  - [🚀 这个 fork 增加了什么](#-这个-fork-增加了什么)
+  - [🤔 我应该用哪个版本？](#-我应该用哪个版本)
+  - [⚡ 快速开始：自托管模式](#-快速开始自托管模式)
+  - [🗺️ Roadmap 与状态](#️-roadmap-与状态)
+  - [📦 上游 DeerFlow 文档](#-上游-deerflow-文档)
   - [官网](#官网)
   - [InfoQuest](#infoquest)
   - [目录](#目录)

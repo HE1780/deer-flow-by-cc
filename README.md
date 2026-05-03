@@ -1,20 +1,166 @@
-# 🦌 DeerFlow - 2.0
+# 🦌 deer-flow-by-cc — Self-Hosted Multi-Tenant DeerFlow
 
-English | [中文](./README_zh.md) | [日本語](./README_ja.md) | [Français](./README_fr.md) | [Русский](./README_ru.md)
+English | [中文](./README_zh.md) | [Français](./README_fr.md) | [Русский](./README_ru.md)
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Upstream: bytedance/deer-flow](https://img.shields.io/badge/Upstream-bytedance%2Fdeer--flow-blue)](https://github.com/bytedance/deer-flow)
 
-<a href="https://trendshift.io/repositories/14699" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14699" alt="bytedance%2Fdeer-flow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-> On February 28th, 2026, DeerFlow claimed the 🏆 #1 spot on GitHub Trending following the launch of version 2. Thanks a million to our incredible community — you made this happen! 💪🔥
+> A production-ready, self-hosted fork of [DeerFlow](https://github.com/bytedance/deer-flow) with **enterprise identity**, **multi-tenant isolation**, and **security hardening** — designed to run privately for your team without giving up upstream's research, sub-agent, and skill capabilities.
+
+This repository is a community fork of [`bytedance/deer-flow`](https://github.com/bytedance/deer-flow). It tracks upstream closely (every feature you see in upstream's README still works here) and adds the missing pieces a small team needs to actually deploy DeerFlow as a shared service: real login, tenant isolation, audit, session resilience, and skill governance.
+
+If you just want to evaluate DeerFlow on your laptop with hosted model APIs, [the upstream repo](https://github.com/bytedance/deer-flow) is the right place to start. If you want to host DeerFlow for your team, keep reading.
+
+---
+
+## 🚀 What This Fork Adds
+
+All additions are **opt-in**. With `ENABLE_IDENTITY=false` (the default), this fork behaves identically to upstream — the changes are dormant.
+
+### 🔐 Enterprise Identity
+
+- **OIDC + password login** side by side (Okta / Azure AD / Keycloak / etc.) — `/api/auth/oidc/{provider}/login` for SSO, password login for service accounts and break-glass.
+- **Self-service registration via codes** — admins generate single-use registration codes (`POST /api/tenants/{tid}/registration-codes`), users redeem them at `/register`. No email server required.
+- **First-run admin bootstrap** — `DEERFLOW_BOOTSTRAP_ADMIN_EMAIL` provisions the platform admin idempotently on startup; admin can change password from the UI.
+- **JWT RS256** — `make identity-keys` writes a 2048-bit keypair under `$DEERFLOW_HOME/_system/`; gateway auto-generates if missing.
+
+### 🛡️ Security Hardening
+
+- **Gateway authn baseline** — all 14 legacy `/api/*` routers require auth by default; `PUBLIC_PREFIXES` is an explicit allowlist (auth flow, `/health`, `/metrics`, internal/audit). Closes a P0 hole where `ENABLE_IDENTITY=true` still left legacy routes wide open.
+- **Session resilience** — 401 responses transparently trigger a singleflight refresh + retry instead of dropping the user to a "Session expired" modal. Both the identity fetch layer and the LangGraph SDK fetch transport share the same singleflight.
+- **Cookie TTL decoupling** — `deerflow_session` `Max-Age` now tracks `refresh_ttl_sec` (7 days) instead of `access_ttl_sec` (15 min), so closing the laptop overnight no longer signs you out.
+- **Audit pipeline** — every authenticated write, RBAC denial, login, and tool denial flows through `AuditMiddleware` → `audit_logs` table; critical events fall back to JSONL on disk if Postgres is unreachable; CSV export with cursor-based pagination.
+
+### 🏢 Multi-Tenant Isolation
+
+- **Per-tenant filesystem layout** under `$DEER_FLOW_HOME` — sandbox bind-mounts, thread data, uploads, outputs, and tenant-scoped skills are physically separated. Cross-tenant access is rejected at the gateway, the sandbox mount layer, and the path guard.
+- **Thread store namespace per user** — listing threads no longer leaks across users on shared deployments.
+- **Tenant-scoped registration codes & roles** — `workspace_member` role added with permission set sized for invited users.
+
+### 🧩 Skill & Agent Governance
+
+- **Skill approval workflow** — pending skills go through `GET /api/admin/skills/pending` → approve/reject; admin UI shows pending / reviewed (rejected + archived) tabs.
+- **Skill bind to thread** — bind skills to a thread via `POST /api/threads/{tid}/skills`, see `/skill-name` badges in chat, "Load to chat" deep-links work end-to-end.
+- **Custom agent edit page** — edit `description / model / SOUL / tool_groups / skills / org_key_env` from the UI with a `tool_groups` dropdown backed by `GET /api/tool-groups`.
+- **Admin pages** — Models management, password change, i18n labels for admin sections.
+
+### ⚙️ Runtime Stability
+
+- **`deerflow.runtime.main_loop` singleton** — Gateway mode uses a process-wide event loop registered via lifespan, eliminating the recurring `Event loop is closed` errors on long sessions and across sub-agent boundaries.
+- **Summarization cascade fix** — prior summaries are tagged in `additional_kwargs` and stripped on the next pass, so the summary text feeds in as a `prior_summary` seed instead of being re-summarized into oblivion.
+- **Tool-call recovery** — `LoopDetectionMiddleware`'s hard-stop now emits `RemoveMessage` for orphaned `ToolMessage`s on the same turn, preventing 400s from providers that strictly validate `tool_call_id` sequences.
+
+### 💬 Frontend Polish
+
+- **401 modal coalescing** — concurrent 401s no longer stack three "Session expired" modals on top of each other.
+- **Chat surface fixes** — `todo_completion_reminder` is filtered alongside `todo_reminder` so LLM error frames don't leak into the chat as fake user messages.
+- **i18n updates** — Models admin labels, registration page, dropped marketing copy from welcome screen.
+
+> **Want the full picture?** Each shipped change has a spec in [`docs/superpowers/specs/archive/`](docs/superpowers/specs/archive/) and an implementation plan in [`docs/plans/archive/`](docs/plans/archive/). The active roadmap lives in [`docs/superpowers/specs/`](docs/superpowers/specs/).
+
+---
+
+## 🤔 Why Use This Fork?
+
+| Your situation | Use upstream `bytedance/deer-flow` | Use `deer-flow-by-cc` |
+|---|:---:|:---:|
+| Single developer, local only | ✅ | — |
+| Evaluation / demo on a laptop | ✅ | — |
+| Self-hosted for a team (2–50 users) | — | ✅ |
+| Need real login (OIDC or password) | — | ✅ |
+| Need tenant data isolation | — | ✅ |
+| Need audit logs for compliance | — | ✅ |
+| Want skill approval workflow before users can publish | — | ✅ |
+| Already running upstream and don't need any of the above | ✅ | — |
+
+**Upgrade path:** This fork is a strict superset. You can switch by re-pointing your `git remote` and running `make db-upgrade`; with `ENABLE_IDENTITY=false` your existing deployment behaves identically.
+
+---
+
+## ⚡ Quick Start: Self-Hosted Mode
+
+The full Quick Start (Docker / local dev / sandbox) is in the [Inherited Documentation](#-inherited-from-upstream-deerflow) below. This section only covers what's specific to **enabling identity**.
+
+### 1. Provision dependencies
+
+```bash
+# docker/docker-compose.yaml ships Postgres 16 + Redis 7 as optional services
+docker compose up -d postgres redis
+```
+
+### 2. Run migrations
+
+```bash
+cd backend && make db-upgrade
+```
+
+### 3. Generate JWT keys
+
+```bash
+cd backend && make identity-keys
+# → writes RS256 keypair to $DEERFLOW_HOME/_system/jwt_{private,public}.pem
+```
+
+### 4. Set environment variables
+
+```bash
+# .env
+ENABLE_IDENTITY=true
+DEERFLOW_DATABASE_URL=postgresql+asyncpg://deerflow:***@localhost:5432/deerflow
+DEERFLOW_REDIS_URL=redis://localhost:6379/0
+DEERFLOW_BOOTSTRAP_ADMIN_EMAIL=you@example.com   # creates first platform admin
+REGISTRATION_CODE_EXPIRES_DAYS=7                  # default 7, clamp 1–90
+```
+
+### 5. (Optional) Configure OIDC
+
+```bash
+cp config/identity.yaml.example config/identity.yaml
+# fill in at least one provider — $VAR references resolve from environment
+```
+
+### 6. Start the gateway and onboard your team
+
+```bash
+make dev   # or make up for production Docker
+```
+
+Then:
+
+1. The bootstrap admin signs in at `/login` with the password printed in startup logs (or via OIDC).
+2. Admin generates registration codes: `POST /api/tenants/{tid}/registration-codes`.
+3. Team members visit `/register`, paste the code, set their password, and they're in.
+
+For the full design, including audit retention, RBAC scopes, and storage layout, see [`docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md`](docs/superpowers/specs/archive/2026-04-21-deerflow-identity-foundation-design.md).
+
+---
+
+## 🗺️ Roadmap & Status
+
+| Area | Status | Notes |
+|---|---|---|
+| Identity foundation (M1–M7) | ✅ Shipped | OIDC, password, registration codes, RBAC, audit, multi-tenant FS |
+| Session refresh resilience | ✅ Shipped | 401-refresh-retry across `identityFetch` + LangGraph SDK |
+| Gateway authn baseline (P0) | ✅ Shipped | 14 legacy routers locked down |
+| Summarization cascade fix | ✅ Shipped | Prior-summary marker, no re-summarization |
+| Skill approval workflow | ✅ Shipped | Pending / reviewed tabs, bind-to-thread |
+| Email notification on registration | 🟡 Deferred | Codes are share-via-channel-of-your-choice today |
+| Self-hosted deployment epic (one-command setup) | 🔜 Planned | Tracked separately |
+
+---
+
+## 📦 Inherited from Upstream DeerFlow
+
+Everything below this line is upstream documentation, kept intact so you have a single source of truth. Skills, sandbox, sub-agents, MCP, IM channels, embedded Python client — all of it works exactly as upstream describes.
+
+> [!NOTE]
+> **DeerFlow 2.0 is a ground-up rewrite.** It shares no code with v1. If you're looking for the original Deep Research framework, it's maintained on the [`1.x` branch](https://github.com/bytedance/deer-flow/tree/main-1.x) — contributions there are still welcome. Active development has moved to 2.0.
 
 DeerFlow (**D**eep **E**xploration and **E**fficient **R**esearch **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
 
 https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
-
-> [!NOTE]
-> **DeerFlow 2.0 is a ground-up rewrite.** It shares no code with v1. If you're looking for the original Deep Research framework, it's maintained on the [`1.x` branch](https://github.com/bytedance/deer-flow/tree/main-1.x) — contributions there are still welcome. Active development has moved to 2.0.
 
 ## Official Website
 
@@ -44,7 +190,12 @@ DeerFlow has newly integrated the intelligent search and crawling toolset indepe
 
 ## Table of Contents
 
-- [🦌 DeerFlow - 2.0](#-deerflow---20)
+- [🦌 deer-flow-by-cc — Self-Hosted Multi-Tenant DeerFlow](#-deer-flow-by-cc--self-hosted-multi-tenant-deerflow)
+  - [🚀 What This Fork Adds](#-what-this-fork-adds)
+  - [🤔 Why Use This Fork?](#-why-use-this-fork)
+  - [⚡ Quick Start: Self-Hosted Mode](#-quick-start-self-hosted-mode)
+  - [🗺️ Roadmap & Status](#️-roadmap--status)
+  - [📦 Inherited from Upstream DeerFlow](#-inherited-from-upstream-deerflow)
   - [Official Website](#official-website)
   - [Coding Plan from ByteDance Volcengine](#coding-plan-from-bytedance-volcengine)
   - [InfoQuest](#infoquest)
